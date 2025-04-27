@@ -1,6 +1,7 @@
 export interface Route {
   route_id: string;
   route_long_name: string;
+  route_name: string;
   route_desc?: string;
   route_type?: number;
   agency_name?: string;
@@ -9,36 +10,37 @@ export interface Route {
     coordinates: number[][][];
     type: string;
   };
-  route_stops?: Array<{
-    stop: {
-      geometry: {
-        coordinates: number[];
-        type: string;
-      };
-      id: number;
-      stop_id: string;
-      stop_name: string;
-    };
-  }>;
+  route_stops?: Stop[];
 }
 
 export interface Stop {
   stop_id: string;
   stop_name: string;
-  stop_lat: string;
-  stop_lon: string;
+  stop_lat: number;
+  stop_lon: number;
+  lat?: number;
+  lon?: number;
   arrivalTime?: string;
   departureTime?: string;
 }
 
 export interface Vehicle {
   vehicle_id: string;
-  route_id: string;
   current_status: string;
-  latitude: number;
-  longitude: number;
-  speed: number;
-  bearing: number;
+  current_stop_sequence: number;
+  stop_id: string;
+  current_position: {
+    lat: number;
+    lon: number;
+  };
   timestamp: string;
-  [key: string]: any;
+  congestion_level: number;
+  speed: number;
+  route_id: string;
+  route_name?: string;
+  stop_name?: string;
+  next_stop_id?: string;
+  next_stop_name?: string;
+  next_stop_arrival?: string;
+  next_stop_departure?: string;
 }

@@ -1,6 +1,6 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useJsApiLoader } from "@react-google-maps/api";
 import { getStopsByRoute } from '@/lib/supabase';
@@ -11,11 +11,9 @@ import VehiclesList from '@/components/vehicles';
 
 const RoutePage = () => {
   const params = useParams();
-  const router = useRouter();
   const routeId = params?.routeid as string;
   
   const [route, setRoute] = useState<Route | null>(null);
-  const [stops, setStops] = useState<Stop[]>([]);
   const [stopsDirection0, setStopsDirection0] = useState<Stop[]>([]);
   const [stopsDirection1, setStopsDirection1] = useState<Stop[]>([]);
   const [activeDirection, setActiveDirection] = useState<number>(0);
@@ -35,7 +33,7 @@ const RoutePage = () => {
     libraries: ["places", "maps"],
   });
 
-  const fetchVehiclePositions = async () => {
+  const fetchVehiclePositions = useCallback(async () => {
     try {
       const response = await fetch(`http://127.0.0.1:5000/api/vehicle-positions/${routeId}`);
       
@@ -55,7 +53,7 @@ const RoutePage = () => {
     } catch (err) {
       console.error('Error fetching vehicle positions:', err);
     }
-  };
+  }, [routeId]);
 
   useEffect(() => {
     const fetchRouteData = async () => {
@@ -108,15 +106,15 @@ const RoutePage = () => {
             const processedStopsDirection0: Stop[] = [];
             const processedStopsDirection1: Stop[] = [];
             
-            routeData.route_stops.forEach((routeStop: any, index: number) => {
+            routeData.route_stops.forEach((routeStop: { stop: { stop_id: string; stop_name: string; geometry: { coordinates: number[] } } }) => {
               const stop = routeStop.stop;
               const stopId = stop.stop_id;
               
               const processedStop = {
                 stop_id: stopId,
                 stop_name: stop.stop_name,
-                stop_lat: stop.geometry.coordinates[1].toString(),
-                stop_lon: stop.geometry.coordinates[0].toString()
+                stop_lat: Number(stop.geometry.coordinates[1]),
+                stop_lon: Number(stop.geometry.coordinates[0])
               };
               
               if (supabaseStopsDirection0.has(stopId)) {
@@ -130,16 +128,12 @@ const RoutePage = () => {
             
             setStopsDirection0(processedStopsDirection0);
             setStopsDirection1(processedStopsDirection1);
-            
-            setStops([...processedStopsDirection0, ...processedStopsDirection1]);
           } else {
             const stopsDirection0Response = await getStopsByRoute(routeId, 0);
             const stopsDirection1Response = await getStopsByRoute(routeId, 1);
             
             setStopsDirection0(stopsDirection0Response);
             setStopsDirection1(stopsDirection1Response);
-            
-            setStops([...stopsDirection0Response, ...stopsDirection1Response]);
           }
         } else {
           throw new Error('Route not found');
@@ -158,10 +152,10 @@ const RoutePage = () => {
   useEffect(() => {
     fetchVehiclePositions();
     
-    const intervalId = setInterval(fetchVehiclePositions, 10000);
+    const intervalId = setInterval(fetchVehiclePositions, 30000);
     
     return () => clearInterval(intervalId);
-  }, [routeId]);
+  }, [fetchVehiclePositions]);
 
   const handleMapLoad = (map: google.maps.Map) => {
     mapRef.current = map;

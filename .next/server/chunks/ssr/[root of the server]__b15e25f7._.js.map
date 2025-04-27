@@ -1,9 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 6, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"","debugId":null}},
-    {"offset": {"line": 6, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"A"}},
-    {"offset": {"line": 48, "column": 0}, "map": {"version":3,"sources":["file://C%3A/Users/Abel/Documents/Code/Undergraduate%20Final%20Project/reroute/src/app/route/%5Brouteid%5D/page.tsx"],"sourcesContent":["import { useRouter } from 'next/router';\r\nimport StopsList from '@/components/StopsList';\r\n\r\nconst RoutePage = () => {\r\n    const router = useRouter();\r\n    const { routeId } = router.query;\r\n\r\n    if (!routeId) return <p>Loading...</p>;\r\n\r\n    return (\r\n        <div>\r\n            <h1>Route {routeId}</h1>\r\n            <StopsList routeId={routeId as string} />\r\n        </div>\r\n    );\r\n};\r\n\r\nexport default RoutePage;\r\n"],"names":[],"mappings":";;;;AAAA;;;;;;;;;AAGA,MAAM,YAAY;IACd,MAAM,SAAS,CAAA,GAAA,8HAAA,CAAA,YAAS,AAAD;IACvB,MAAM,EAAE,OAAO,EAAE,GAAG,OAAO,KAAK;IAEhC,IAAI,CAAC,SAAS,qBAAO,8OAAC;kBAAE;;;;;;IAExB,qBACI,8OAAC;;0BACG,8OAAC;;oBAAG;oBAAO;;;;;;;0BACX,8OAAC;gBAAU,SAAS;;;;;;;;;;;;AAGhC;uCAEe","debugId":null}},
-    {"offset": {"line": 98, "column": 0}, "map": {"version":3,"sources":[],"names":[],"mappings":"A"}}]
-}

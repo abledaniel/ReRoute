@@ -1,0 +1,10 @@
+{
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "@typescript-eslint/no-unused-vars": ["warn", {
+      "varsIgnorePattern": "^(router|busStops|isLoading|setIsLoading|error|setError|locationError)$",
+      "argsIgnorePattern": "^_"
+    }],
+    "react-hooks/exhaustive-deps": "warn"
+  }
+} 

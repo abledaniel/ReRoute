@@ -1,7 +1,7 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { useJsApiLoader, GoogleMap, Marker, DirectionsRenderer } from "@react-google-maps/api";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import '@/styles/base.css';
 import '@/styles/directions.css';
@@ -9,28 +9,40 @@ import '@/styles/map.css';
 import { mapStyles } from '@/styles/mapstyle';
 
 const DirectionsPage = () => {
-  const router = useRouter();
+  return (
+    <Suspense fallback={
+      <div style={{
+        minHeight: "100vh",
+        display: "flex", 
+        justifyContent: "center", 
+        alignItems: "center",
+        background: "linear-gradient(to right, #1e3c72, #2a5298)",
+        color: "white"
+      }}>
+        Loading...
+      </div>
+    }>
+      <DirectionsContent />
+    </Suspense>
+  );
+};
+
+const DirectionsContent = () => {
   const searchParams = useSearchParams();
   const defaultPosition = { lat: 33.878840, lng: -117.884973 };
   
   const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
-  const [busStops, setBusStops] = useState<{ stop_id: string; stop_name: string; lat: number; lng: number }[]>([]);
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
+  const [mapCenter, setMapCenter] = useState(defaultPosition);
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [routeStops, setRouteStops] = useState<{ stop_id: string; stop_name: string; lat: number; lng: number }[]>([]);
   const [routeDetails, setRouteDetails] = useState<{
     duration: string;
     arrivalTime: string;
     distance: string;
   } | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [mapCenter, setMapCenter] = useState(defaultPosition);
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
-  const [nearestStop, setNearestStop] = useState<{ stop_id: string; stop_name: string; lat: number; lng: number; distance: number } | null>(null);
-  const [routeStops, setRouteStops] = useState<{ stop_id: string; stop_name: string; lat: number; lng: number }[]>([]);
-  const [routeId, setRouteId] = useState<string | null>(null);
   
   const mapRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<any>(null);
+  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const directionsService = useRef<google.maps.DirectionsService | null>(null);
 
   const { isLoaded } = useJsApiLoader({
@@ -38,17 +50,16 @@ const DirectionsPage = () => {
     libraries: ["places", "maps"],
   });
 
-  const handleLocationUpdate = (position: GeolocationPosition) => {
+  const handleLocationUpdate = useCallback((position: GeolocationPosition) => {
     const newPosition = {
       lat: Number(position.coords.latitude.toFixed(9)),
       lng: Number(position.coords.longitude.toFixed(9)),
     };
     setUserPosition(newPosition);
     setMapCenter(newPosition);
-    setLocationError(null);
-  };
+  }, []);
 
-  const createUserMarker = () => {
+  const createUserMarker = useCallback(() => {
     if (!mapRef.current || !userPosition || !window.google || !window.google.maps || !window.google.maps.marker) return;
 
     try {
@@ -65,7 +76,7 @@ const DirectionsPage = () => {
     } catch (error) {
       console.error("Error creating advanced marker:", error);
     }
-  };
+  }, [userPosition]);
 
   const createMarkerContent = () => {
     const div = document.createElement('div');
@@ -137,10 +148,6 @@ const DirectionsPage = () => {
     const distanceParam = searchParams.get('distance');
     const routeIdParam = searchParams.get('routeId');
     
-    if (originParam) setOrigin(decodeURIComponent(originParam));
-    if (destinationParam) setDestination(decodeURIComponent(destinationParam));
-    if (routeIdParam) setRouteId(decodeURIComponent(routeIdParam));
-    
     if (durationParam && arrivalTimeParam && distanceParam) {
       setRouteDetails({
         duration: decodeURIComponent(durationParam),
@@ -149,19 +156,18 @@ const DirectionsPage = () => {
       });
     }
 
-    if (routeIdParam) fetchRouteStops(routeIdParam);
+    if (routeIdParam) {
+      fetchRouteStops(routeIdParam);
+    }
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         handleLocationUpdate,
         (error) => {
-          setLocationError(`Error getting location: ${error.message}`);
           console.error("Error getting location:", error);
         },
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 }
       );
-    } else {
-      setLocationError("Geolocation is not supported by your browser");
     }
 
     if (isLoaded) {
@@ -171,14 +177,14 @@ const DirectionsPage = () => {
         calculateRoute(decodeURIComponent(originParam), decodeURIComponent(destinationParam));
       }
     }
-  }, [isLoaded, searchParams]);
+  }, [isLoaded, searchParams, handleLocationUpdate]);
 
   useEffect(() => {
     if (isLoaded && userPosition) {
       const timer = setTimeout(createUserMarker, 500);
       return () => clearTimeout(timer);
     }
-  }, [isLoaded, userPosition]);
+  }, [isLoaded, userPosition, createUserMarker]);
 
   useEffect(() => {
     if (userPosition && mapRef.current) {
@@ -246,16 +252,16 @@ const DirectionsPage = () => {
           </div>
         </div>
 
-          <div style={{
-            display: "flex",
-          gap: "24px", 
+        <div style={{
+          display: "flex",
+          gap: "24px",
           height: "calc(100vh - 100px)"
         }}>
           <div style={{ flex: "1.5", position: "relative" }}>
-            <div style={{ 
-              position: "absolute", 
-              top: "0", 
-              left: "0", 
+            <div style={{
+              position: "absolute",
+              top: "0",
+              left: "0",
               right: "0",
               zIndex: "1",
               padding: "16px"
@@ -268,39 +274,27 @@ const DirectionsPage = () => {
               }}>
                 <h2 style={{ fontSize: "20px", marginBottom: "16px" }}>Route Information</h2>
                 {routeDetails && (
-                <div>
+                  <div>
                     <p>Duration: {routeDetails.duration}</p>
                     <p>Distance: {routeDetails.distance}</p>
                     <p>Arrives: {routeDetails.arrivalTime}</p>
-                </div>
+                  </div>
                 )}
               </div>
+            </div>
 
-            {nearestStop && (
-              <div style={{
-                  background: "rgba(0, 0, 0, 0.5)",
-                padding: "16px",
-                  borderRadius: "10px"
-              }}>
-                  <h3>Nearest Bus Stop</h3>
-                  <p>{nearestStop.stop_name}</p>
-                  <p>Distance: {nearestStop.distance.toFixed(2)} meters</p>
-                </div>
-              )}
-              </div>
-
-              <GoogleMap
-                zoom={14}
-                center={mapCenter}
-                mapContainerStyle={{ height: "100%", width: "100%" }}
-                options={{
-                  fullscreenControl: false,
-                  streetViewControl: false,
-                  mapTypeControl: false,
+            <GoogleMap
+              zoom={14}
+              center={mapCenter}
+              mapContainerStyle={{ height: "100%", width: "100%" }}
+              options={{
+                fullscreenControl: false,
+                streetViewControl: false,
+                mapTypeControl: false,
                 styles: mapStyles
-                }}
-                onLoad={(map) => {
-                  mapRef.current = map;
+              }}
+              onLoad={(map) => {
+                mapRef.current = map;
               }}
             >
               {userPosition && (
@@ -317,49 +311,35 @@ const DirectionsPage = () => {
                 />
               )}
 
-                {directions && (
-                  <DirectionsRenderer
-                    directions={directions}
-                    options={{
-                      suppressMarkers: false,
-                      polylineOptions: {
-                        strokeColor: "#2563eb",
+              {directions && (
+                <DirectionsRenderer
+                  directions={directions}
+                  options={{
+                    suppressMarkers: false,
+                    polylineOptions: {
+                      strokeColor: "#2563eb",
                       strokeWeight: 4,
                       strokeOpacity: 0.8
                     }
-                    }}
-                  />
-                )}
-                
-                {routeStops.map((stop) => (
-                  <Marker
-                    key={stop.stop_id}
-                    position={{ lat: stop.lat, lng: stop.lng }}
-                    icon={{
-                      path: google.maps.SymbolPath.CIRCLE,
-                      scale: 8,
-                    fillColor: "#c5acff",
-                    fillOpacity: 0.8,
-                    strokeColor: "#FFFFFF",
-                    strokeWeight: 2,
-                    }}
-                  />
-                ))}
-                
-                {nearestStop && (
-                  <Marker
-                    position={{ lat: nearestStop.lat, lng: nearestStop.lng }}
-                    icon={{
-                      path: google.maps.SymbolPath.CIRCLE,
+                  }}
+                />
+              )}
+
+              {routeStops.map((stop) => (
+                <Marker
+                  key={stop.stop_id}
+                  position={{ lat: stop.lat, lng: stop.lng }}
+                  icon={{
+                    path: google.maps.SymbolPath.CIRCLE,
                     scale: 8,
                     fillColor: "#c5acff",
                     fillOpacity: 0.8,
                     strokeColor: "#FFFFFF",
                     strokeWeight: 2,
-                    }}
-                  />
-                )}
-              </GoogleMap>
+                  }}
+                />
+              ))}
+            </GoogleMap>
           </div>
 
           <div style={{
@@ -370,33 +350,33 @@ const DirectionsPage = () => {
             overflowY: "auto"
           }}>
             {directions && directions.routes[0] && (
-            <div style={{
+              <div style={{
                 background: "rgba(0, 0, 0, 0.5)",
-              padding: "24px",
+                padding: "24px",
                 borderRadius: "10px"
-            }}>
+              }}>
                 <h2 style={{ fontSize: "20px", marginBottom: "16px" }}>Directions</h2>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                    {directions.routes[0].legs[0].steps.map((step, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          background: "rgba(255, 255, 255, 0.1)",
-                          padding: "16px",
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {directions.routes[0].legs[0].steps.map((step, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        background: "rgba(255, 255, 255, 0.1)",
+                        padding: "16px",
                         borderRadius: "8px"
-                        }}
-                      >
-                          <div dangerouslySetInnerHTML={{ __html: step.instructions }} />
+                      }}
+                    >
+                      <div dangerouslySetInnerHTML={{ __html: step.instructions }} />
                       {step.transit && (
-                          <div style={{ marginTop: "8px", color: "#93c5fd" }}>
+                        <div style={{ marginTop: "8px", color: "#93c5fd" }}>
                           <p>Route: {step.transit.line.short_name || step.transit.line.name}</p>
                           <p>Departure: {step.transit.departure_time.text}</p>
                           <p>Arrival: {step.transit.arrival_time.text}</p>
                         </div>
                       )}
-                      </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

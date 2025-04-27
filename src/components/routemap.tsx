@@ -92,8 +92,8 @@ const RouteMap: React.FC<RouteMapProps> = ({
           <Marker
             key={stop.stop_id}
             position={{
-              lat: parseFloat(stop.stop_lat),
-              lng: parseFloat(stop.stop_lon)
+              lat: stop.stop_lat,
+              lng: stop.stop_lon
             }}
             title={stop.stop_name}
             onClick={() => onStopSelect(stop)}
@@ -105,8 +105,8 @@ const RouteMap: React.FC<RouteMapProps> = ({
           <Marker
             key={vehicle.vehicle_id}
             position={{
-              lat: vehicle.latitude,
-              lng: vehicle.longitude
+              lat: vehicle.current_position.lat,
+              lng: vehicle.current_position.lon
             }}
             title={`Vehicle ${vehicle.vehicle_id}`}
             onClick={() => onVehicleSelect(vehicle)}
@@ -117,8 +117,8 @@ const RouteMap: React.FC<RouteMapProps> = ({
         {selectedStop && (
           <InfoWindow
             position={{
-              lat: parseFloat(selectedStop.stop_lat),
-              lng: parseFloat(selectedStop.stop_lon)
+              lat: selectedStop.stop_lat,
+              lng: selectedStop.stop_lon
             }}
             onCloseClick={onStopClose}
           >
@@ -132,8 +132,8 @@ const RouteMap: React.FC<RouteMapProps> = ({
         {selectedVehicle && (
           <InfoWindow
             position={{
-              lat: selectedVehicle.latitude,
-              lng: selectedVehicle.longitude
+              lat: selectedVehicle.current_position.lat,
+              lng: selectedVehicle.current_position.lon
             }}
             onCloseClick={onVehicleClose}
           >

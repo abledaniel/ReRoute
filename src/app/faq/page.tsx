@@ -67,7 +67,7 @@ const FAQPage = () => {
           }}>
             <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>What is ReRoute?</h3>
             <p style={{ lineHeight: "1.6" }}>
-              ReRoute is a transit web application that uses the transit system's API to display and process real-time information about bus routes, stops, and vehicles. 
+              ReRoute is a transit web application that uses the transit system&apos;s API to display and process real-time information about bus routes, stops, and vehicles. 
               It helps users quickly access the latest transit information to plan their journeys more effectively.
             </p>
           </div>
@@ -79,7 +79,7 @@ const FAQPage = () => {
           }}>
             <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>How does ReRoute work?</h3>
             <p style={{ lineHeight: "1.6" }}>
-              ReRoute connects to the transit system's API to fetch real-time data about bus routes, stops, and vehicles. 
+              ReRoute connects to the transit system&apos;s API to fetch real-time data about bus routes, stops, and vehicles. 
               This data is processed and displayed in an easy-to-use interface. As more data is collected, machine learning models 
               will be used to predict the most likely arrival times for buses at specific stops.
             </p>
@@ -131,7 +131,7 @@ const FAQPage = () => {
           }}>
             <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>How accurate are the arrival predictions?</h3>
             <p style={{ lineHeight: "1.6" }}>
-              ReRoute uses real-time data from the transit system's API to provide current information about bus locations. 
+              ReRoute uses real-time data from the transit system&apos;s API to provide current information about bus locations. 
               As more historical data is collected, machine learning models will be implemented to improve arrival time predictions, 
               taking into account factors such as traffic patterns, time of day, and day of the week.
             </p>
@@ -156,7 +156,7 @@ const FAQPage = () => {
           }}>
             <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>How often is the data updated?</h3>
             <p style={{ lineHeight: "1.6" }}>
-              Bus location data is updated in real-time from the transit system's API. Route and stop information is updated regularly to reflect any changes in the transit system.
+              Bus location data is updated in real-time from the transit system&apos;s API. Route and stop information is updated regularly to reflect any changes in the transit system.
             </p>
           </div>
 

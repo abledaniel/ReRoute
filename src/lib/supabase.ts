@@ -14,7 +14,7 @@ export async function getStopsByRoute(routeId: string, direction: number = 0) {
     return [];
   }
 
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .rpc('get', { 
       route_num: routeId, 
       direction_num: direction 

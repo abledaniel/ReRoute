@@ -1,29 +1,25 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useJsApiLoader, GoogleMap, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { useRouter } from "next/navigation";
-import { supabase } from '@/lib/supabase';
 import '@/styles/map.css';
 import { mapStyles } from '@/styles/mapstyle';
 import Link from "next/link";
+import { Route } from "@/types/route";
 
 const Page = () => {
   const router = useRouter();
-    const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
   const defaultPosition = { lat: 33.878840, lng: -117.884973 }; // Default map center
-    const [busStops, setBusStops] = useState<{ stop_id: string; stop_name: string; lat: number; lng: number }[]>([]);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [origin, setOrigin] = useState("");
-    const [destination, setDestination] = useState("");
-    const [routes, setRoutes] = useState<{ route_id: string; route_name: string; route_url: string }[]>([]);
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [routes, setRoutes] = useState<Route[]>([]);
   const [locationError, setLocationError] = useState<string | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<any>(null);
+  const markerRef = useRef<google.maps.Marker | google.maps.marker.AdvancedMarkerElement | null>(null);
   const [mapCenter, setMapCenter] = useState(defaultPosition);
   const initialLoadRef = useRef(true);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
-  const [originAutocomplete, setOriginAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-  const [destinationAutocomplete, setDestinationAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const originInputRef = useRef<HTMLInputElement>(null);
   const destinationInputRef = useRef<HTMLInputElement>(null);
   const directionsService = useRef<google.maps.DirectionsService | null>(null);
@@ -35,348 +31,14 @@ const Page = () => {
     steps: google.maps.DirectionsStep[];
     routeId: string;
   } | null>(null);
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
-    const { isLoaded } = useJsApiLoader({
-        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-        libraries: ["places", "maps"], 
-    });
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+    libraries: ["places", "maps"], 
+  });
 
-  // Separate function to handle location updates
-  const handleLocationUpdate = (position: GeolocationPosition) => {
-    const newPosition = {
-      lat: Number(position.coords.latitude.toFixed(9)),
-      lng: Number(position.coords.longitude.toFixed(9)),
-    };
-    
-    // Only update user position and map center on initial load
-    if (initialLoadRef.current) {
-      setUserPosition(newPosition);
-      setMapCenter(newPosition);
-      initialLoadRef.current = false;
-    }
-    
-    // Always fetch routes based on current map center, not user position
-    if (mapRef.current) {
-      const center = mapRef.current.getCenter();
-      if (center) {
-        fetchRoutes(center.lat(), center.lng(), setRoutes);
-      }
-    }
-    
-    setLocationError(null);
-  };
-
-  // Function to handle map center changes
-  const handleMapCenterChanged = () => {
-    if (mapRef.current) {
-      const center = mapRef.current.getCenter();
-      if (center) {
-        const newCenter = {
-          lat: Number(center.lat().toFixed(9)),
-          lng: Number(center.lng().toFixed(9))
-        };
-        setMapCenter(newCenter);
-        fetchRoutes(newCenter.lat, newCenter.lng, setRoutes);
-      }
-    }
-  };
-
-  // Function to update the advanced marker
-  const updateUserMarker = () => {
-    if (!mapRef.current || !userPosition || !window.google || !window.google.maps || !window.google.maps.marker) {
-      console.log("Cannot create marker - missing dependencies:", {
-        map: !!mapRef.current,
-        userPosition: !!userPosition,
-        google: !!window.google,
-        maps: !!(window.google && window.google.maps),
-        marker: !!(window.google && window.google.maps && window.google.maps.marker)
-      });
-      
-      // Fallback to standard marker if advanced marker fails
-      if (mapRef.current && userPosition && window.google && window.google.maps) {
-        // Remove existing marker if it exists
-        if (markerRef.current) {
-          markerRef.current.setMap(null);
-        }
-        
-        // Create a standard marker as fallback
-        const standardMarker = new window.google.maps.Marker({
-          position: userPosition,
-          map: mapRef.current,
-          title: "Your Location",
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: "#c5acff", // Purple color
-            fillOpacity: 1,
-            strokeColor: "#FFFFFF",
-            strokeWeight: 2,
-          }
-        });
-        
-        markerRef.current = standardMarker;
-        console.log("Standard marker created as fallback");
-      }
-      
-      return;
-    }
-
-    try {
-      // Remove existing marker if it exists
-      if (markerRef.current) {
-        markerRef.current.map = null;
-      }
-
-      // Create a new advanced marker
-      const markerView = new window.google.maps.marker.AdvancedMarkerElement({
-        map: mapRef.current,
-        position: userPosition,
-        title: "Your Location",
-        content: createMarkerContent(),
-      });
-
-      markerRef.current = markerView;
-      console.log("Advanced marker created successfully");
-    } catch (error) {
-      console.error("Error creating advanced marker:", error);
-      
-      // Fallback to standard marker if advanced marker fails
-      if (mapRef.current && userPosition && window.google && window.google.maps) {
-        const standardMarker = new window.google.maps.Marker({
-          position: userPosition,
-          map: mapRef.current,
-          title: "Your Location",
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: "#c5acff", // Purple color
-            fillOpacity: 1,
-            strokeColor: "#FFFFFF",
-            strokeWeight: 2,
-          }
-        });
-        
-        markerRef.current = standardMarker;
-        console.log("Standard marker created as fallback after error");
-      }
-    }
-  };
-
-  // Function to create custom marker content
-  const createMarkerContent = () => {
-    const div = document.createElement('div');
-    div.className = 'custom-marker';
-    div.innerHTML = `
-            <div style="
-                background-color: #c5acff; /* Purple color */
-                border-radius: 50%;
-                width: 20px;
-                height: 20px;
-                border: 2px solid white;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-weight: bold;
-                font-size: 12px;
-            ">
-                You
-            </div>
-        `;
-    return div;
-  };
-
-  // Update marker when user position changes
-  useEffect(() => {
-    if (isLoaded && userPosition) {
-      // Add a small delay to ensure the marker library is fully loaded
-      const timer = setTimeout(() => {
-        updateUserMarker();
-      }, 500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isLoaded, userPosition]);
-
-  // Fetch routes when map center changes
-  useEffect(() => {
-    if (isLoaded && mapCenter) {
-      fetchRoutes(mapCenter.lat, mapCenter.lng, setRoutes);
-    }
-  }, [isLoaded, mapCenter]);
-
-    useEffect(() => {
-    // Immediately fetch routes with default position
-    fetchRoutes(defaultPosition.lat, defaultPosition.lng, setRoutes);
-
-        const fetchStopsData = async () => {
-            try {
-                const response = await fetch("/stops.csv");
-                const stopsData = await response.text();
-
-                const stops: { stop_id: string; stop_name: string; lat: number; lng: number }[] = [];
-                const rows = stopsData.split("\n");
-
-                rows.slice(1).forEach((row) => {
-                    const columns = row.split(",");
-                    if (columns.length === 4) {
-                        const stop_id = columns[0].trim();
-                        const stop_name = columns[1].trim();
-                        const lat = parseFloat(columns[2].trim());
-                        const lng = parseFloat(columns[3].trim());
-                        if (!isNaN(lat) && !isNaN(lng)) {
-                            stops.push({ stop_id, stop_name, lat, lng });
-                        }
-                    }
-                });
-
-                setBusStops(stops);
-            } catch (error) {
-                console.error("Error fetching stop data:", error);
-            }
-        };
-
-        fetchStopsData();
-
-    // Get initial position
-        if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        handleLocationUpdate,
-        (error) => {
-          console.error("Error getting high-accuracy location:", error);
-          // Fallback to low-accuracy if high-accuracy fails
-          navigator.geolocation.getCurrentPosition(
-            handleLocationUpdate,
-            (error) => {
-              setLocationError(`Error getting location: ${error.message}`);
-              console.error("Error getting low-accuracy location:", error);
-            },
-            {
-              enableHighAccuracy: false,
-              maximumAge: 60000,
-              timeout: 30000,
-            }
-          );
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 30000,
-          timeout: 27000,
-        }
-      );
-
-      // Set up continuous watching with more relaxed parameters
-            const watchId = navigator.geolocation.watchPosition(
-        handleLocationUpdate,
-                (error) => {
-          setLocationError(`Error tracking location: ${error.message}`);
-          console.error("Error watching location:", error);
-                },
-                {
-                    enableHighAccuracy: true,
-          maximumAge: 60000, // Accept positions up to 1 minute old
-          timeout: 30000, // Wait up to 30 seconds for a position
-                }
-            );
-
-      return () => {
-        navigator.geolocation.clearWatch(watchId);
-        // Clean up marker when component unmounts
-        if (markerRef.current) {
-          markerRef.current.map = null;
-        }
-      };
-    } else {
-      setLocationError("Geolocation is not supported by your browser");
-        }
-    }, []);
-
-    const fetchRoutes = async (lat: number, lng: number, setRoutes: (routes: any[]) => void) => {
-        try {
-      // Format coordinates to 9 decimal places
-      const formattedLat = Number(lat.toFixed(9));
-      const formattedLng = Number(lng.toFixed(9));
-
-      // Log the request for debugging
-      console.log(`Fetching routes for lat: ${formattedLat}, lon: ${formattedLng}`);
-
-      const apiKey = process.env.NEXT_PUBLIC_TRANSIT_LAND_API_KEY || '4i0HhaRLe0jBSotDmxETH05X2iwrgNcJ';
-            const response = await fetch(
-        `https://transit.land/api/v2/rest/routes?lat=${formattedLat}&lon=${formattedLng}&radius=1000&api_key=${apiKey}`
-            );
-            
-            if (!response.ok) {
-        throw new Error(`Transit.land API error: ${response.status} ${response.statusText}`);
-            }
-    
-            const data = await response.json();
-
-      if (!data.routes || data.routes.length === 0) {
-        console.log("No routes found from Transit.land API");
-        setRoutes([]);
-        return;
-      }
-
-      // Format routes for display - using route_id and route_long_name from the API response
-      const formattedRoutes = data.routes.map((route: any) => ({
-                        route_id: route.route_id,
-        route_name: route.route_long_name || route.route_short_name || `Route ${route.route_id}`,
-        route_url: route.route_url || '#'
-      }));
-
-      console.log(`Found ${formattedRoutes.length} nearby routes from Transit.land:`, formattedRoutes);
-      setRoutes(formattedRoutes);
-        } catch (error) {
-      console.error("Error fetching routes from Transit.land:", error);
-      setRoutes([]);
-        }
-  };
-    
-  // Function to handle route click
-  const handleRouteClick = (routeId: string) => {
-    router.push(`/route/${routeId}`);
-    };
-
-  useEffect(() => {
-    if (isLoaded && originInputRef.current && destinationInputRef.current) {
-      // Initialize autocomplete for origin
-      const originAutocompleteInstance = new google.maps.places.Autocomplete(originInputRef.current, {
-        types: ['establishment', 'geocode'],
-        componentRestrictions: { country: 'us' }
-      });
-      setOriginAutocomplete(originAutocompleteInstance);
-
-      // Initialize autocomplete for destination
-      const destinationAutocompleteInstance = new google.maps.places.Autocomplete(destinationInputRef.current, {
-        types: ['establishment', 'geocode'],
-        componentRestrictions: { country: 'us' }
-      });
-      setDestinationAutocomplete(destinationAutocompleteInstance);
-
-      // Initialize directions service
-      directionsService.current = new google.maps.DirectionsService();
-
-      // Add listeners for place selection
-      originAutocompleteInstance.addListener('place_changed', () => {
-        const place = originAutocompleteInstance.getPlace();
-        if (place.geometry) {
-          setOrigin(place.formatted_address || '');
-          calculateRoute();
-        }
-      });
-
-      destinationAutocompleteInstance.addListener('place_changed', () => {
-        const place = destinationAutocompleteInstance.getPlace();
-        if (place.geometry) {
-          setDestination(place.formatted_address || '');
-          calculateRoute();
-        }
-      });
-    }
-  }, [isLoaded]);
-
-  const calculateRoute = () => {
+  const calculateRoute = useCallback(() => {
     if (!directionsService.current || !origin || !destination) return;
 
     directionsService.current.route(
@@ -421,7 +83,308 @@ const Page = () => {
         }
       }
     );
+  }, [origin, destination]);
+
+  const fetchRoutes = useCallback(async (lat: number, lng: number, setRoutes: (routes: Route[]) => void) => {
+    try {
+      const response = await fetch(`/api/route?lat=${lat}&lng=${lng}`);
+      const data = await response.json();
+      if (data.routes) {
+        setRoutes(data.routes);
+      }
+    } catch (error) {
+      console.error("Error fetching routes:", error);
+    }
+  }, []);
+
+  // Debounced version of fetchRoutes to prevent excessive API calls
+  const debouncedFetchRoutes = useCallback((lat: number, lng: number) => {
+    // Clear any existing timer
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    
+    // Set a new timer
+    const timer = setTimeout(() => {
+      fetchRoutes(lat, lng, setRoutes);
+    }, 1000); // 1 second debounce
+    
+    setDebounceTimer(timer);
+  }, [debounceTimer, fetchRoutes, setRoutes]);
+
+  // Separate function to handle location updates
+  const handleLocationUpdate = useCallback((position: GeolocationPosition) => {
+    const newPosition = {
+      lat: Number(position.coords.latitude.toFixed(9)),
+      lng: Number(position.coords.longitude.toFixed(9)),
+    };
+    
+    // Only update user position and map center on initial load
+    if (initialLoadRef.current) {
+      setUserPosition(newPosition);
+      setMapCenter(newPosition);
+      initialLoadRef.current = false;
+    }
+    
+    // Always fetch routes based on current map center, not user position
+    if (mapRef.current) {
+      const center = mapRef.current.getCenter();
+      if (center) {
+        debouncedFetchRoutes(center.lat(), center.lng());
+      }
+    }
+    
+    setLocationError(null);
+  }, [debouncedFetchRoutes]);
+
+  // Function to handle map center changes
+  const handleMapCenterChanged = useCallback(() => {
+    if (mapRef.current) {
+      const center = mapRef.current.getCenter();
+      if (center) {
+        const newCenter = {
+          lat: Number(center.lat().toFixed(9)),
+          lng: Number(center.lng().toFixed(9))
+        };
+        setMapCenter(newCenter);
+        debouncedFetchRoutes(newCenter.lat, newCenter.lng);
+      }
+    }
+  }, [debouncedFetchRoutes]);
+
+  // Function to update the advanced marker
+  const updateUserMarker = useCallback(() => {
+    if (!mapRef.current || !userPosition || !window.google || !window.google.maps || !window.google.maps.marker) {
+      console.log("Cannot create marker - missing dependencies:", {
+        map: !!mapRef.current,
+        userPosition: !!userPosition,
+        google: !!window.google,
+        maps: !!(window.google && window.google.maps),
+        marker: !!(window.google && window.google.maps && window.google.maps.marker)
+      });
+      
+      // Fallback to standard marker if advanced marker fails
+      if (mapRef.current && userPosition && window.google && window.google.maps) {
+        // Remove existing marker if it exists
+        if (markerRef.current) {
+          if ('setMap' in markerRef.current) {
+            markerRef.current.setMap(null);
+          } else {
+            markerRef.current.map = null;
+          }
+        }
+        
+        // Create a standard marker as fallback
+        const standardMarker = new window.google.maps.Marker({
+          position: userPosition,
+          map: mapRef.current,
+          title: "Your Location",
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: "#c5acff", // Purple color
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+          }
+        });
+        
+        markerRef.current = standardMarker;
+        console.log("Standard marker created as fallback");
+      }
+      
+      return;
+    }
+
+    try {
+      // Remove existing marker if it exists
+      if (markerRef.current) {
+        if ('setMap' in markerRef.current) {
+          markerRef.current.setMap(null);
+        } else {
+          markerRef.current.map = null;
+        }
+      }
+
+      // Create a new advanced marker
+      const markerView = new window.google.maps.marker.AdvancedMarkerElement({
+        map: mapRef.current,
+        position: userPosition,
+        title: "Your Location",
+        content: createMarkerContent(),
+      });
+
+      markerRef.current = markerView;
+      console.log("Advanced marker created successfully");
+    } catch (error) {
+      console.error("Error creating advanced marker:", error);
+      
+      // Fallback to standard marker if advanced marker fails
+      if (mapRef.current && userPosition && window.google && window.google.maps) {
+        const standardMarker = new window.google.maps.Marker({
+          position: userPosition,
+          map: mapRef.current,
+          title: "Your Location",
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: "#c5acff", // Purple color
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+          }
+        });
+        
+        markerRef.current = standardMarker;
+        console.log("Standard marker created as fallback after error");
+      }
+    }
+  }, [userPosition]);
+
+  // Function to create custom marker content
+  const createMarkerContent = () => {
+    const div = document.createElement('div');
+    div.className = 'custom-marker';
+    div.innerHTML = `
+            <div style="
+                background-color: #c5acff; /* Purple color */
+                border-radius: 50%;
+                width: 20px;
+                height: 20px;
+                border: 2px solid white;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+            ">
+                You
+            </div>
+        `;
+    return div;
   };
+
+  // Update marker when user position changes
+  useEffect(() => {
+    if (isLoaded && userPosition) {
+      const timer = setTimeout(updateUserMarker, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoaded, userPosition, updateUserMarker]);
+
+  // Fetch routes when map center changes - but only if it's a significant change
+  useEffect(() => {
+    if (isLoaded && mapCenter) {
+      // Only fetch if the map has been loaded and the center has changed significantly
+      if (mapRef.current) {
+        debouncedFetchRoutes(mapCenter.lat, mapCenter.lng);
+      }
+    }
+  }, [isLoaded, mapCenter, debouncedFetchRoutes]);
+
+  useEffect(() => {
+    // Immediately fetch routes with default position only once
+    fetchRoutes(defaultPosition.lat, defaultPosition.lng, setRoutes);
+
+    // Get initial position
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        handleLocationUpdate,
+        (error) => {
+          console.error("Error getting high-accuracy location:", error);
+          // Fallback to low-accuracy if high-accuracy fails
+          navigator.geolocation.getCurrentPosition(
+            handleLocationUpdate,
+            (error) => {
+              setLocationError(`Error getting location: ${error.message}`);
+              console.error("Error getting low-accuracy location:", error);
+            },
+            {
+              enableHighAccuracy: false,
+              maximumAge: 60000,
+              timeout: 30000,
+            }
+          );
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 30000,
+          timeout: 27000,
+        }
+      );
+
+      // Set up continuous watching with more relaxed parameters
+      const watchId = navigator.geolocation.watchPosition(
+        handleLocationUpdate,
+        (error) => {
+          setLocationError(`Error tracking location: ${error.message}`);
+          console.error("Error watching location:", error);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 60000, // Accept positions up to 1 minute old
+          timeout: 30000, // Wait up to 30 seconds for a position
+        }
+      );
+
+      return () => {
+        navigator.geolocation.clearWatch(watchId);
+        // Clean up marker when component unmounts
+        if (markerRef.current) {
+          if ('setMap' in markerRef.current) {
+            markerRef.current.setMap(null);
+          } else {
+            markerRef.current.map = null;
+          }
+        }
+      };
+    } else {
+      setLocationError("Geolocation is not supported by your browser");
+    }
+  }, [defaultPosition.lat, defaultPosition.lng, handleLocationUpdate, fetchRoutes]);
+
+  // Function to handle route click
+  const handleRouteClick = (routeId: string) => {
+    router.push(`/route/${routeId}`);
+  };
+
+  useEffect(() => {
+    if (isLoaded && originInputRef.current && destinationInputRef.current) {
+      // Initialize autocomplete for origin
+      const originAutocompleteInstance = new google.maps.places.Autocomplete(originInputRef.current, {
+        types: ['establishment', 'geocode'],
+        componentRestrictions: { country: 'us' }
+      });
+
+      // Initialize autocomplete for destination
+      const destinationAutocompleteInstance = new google.maps.places.Autocomplete(destinationInputRef.current, {
+        types: ['establishment', 'geocode'],
+        componentRestrictions: { country: 'us' }
+      });
+
+      // Initialize directions service
+      directionsService.current = new google.maps.DirectionsService();
+
+      // Add listeners for place selection
+      originAutocompleteInstance.addListener('place_changed', () => {
+        const place = originAutocompleteInstance.getPlace();
+        if (place.geometry) {
+          setOrigin(place.formatted_address || '');
+          calculateRoute();
+        }
+      });
+
+      destinationAutocompleteInstance.addListener('place_changed', () => {
+        const place = destinationAutocompleteInstance.getPlace();
+        if (place.geometry) {
+          setDestination(place.formatted_address || '');
+          calculateRoute();
+        }
+      });
+    }
+  }, [isLoaded, calculateRoute]);
 
   // Function to navigate to directions page
   const goToDirections = () => {
@@ -437,9 +400,9 @@ const Page = () => {
       
       router.push(`/directions?${params.toString()}`);
     }
-    };
+  };
 
-    if (!isLoaded) {
+  if (!isLoaded) {
     return (
       <div style={{
         minHeight: "100vh",
@@ -454,9 +417,9 @@ const Page = () => {
         </div>
       </div>
     );
-    }
+  }
 
-    return (
+  return (
     <div style={{
       minHeight: "100vh",
       background: "linear-gradient(to right, #1e3c72, #2a5298)",
