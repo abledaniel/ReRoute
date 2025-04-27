@@ -8,7 +8,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-export async function getStopsByRoute(routeId: string) {
+export async function getStopsByRoute(routeId: string, direction: number = 0) {
   if (!routeId) {
     console.error("Route ID is required.");
     return [];
@@ -16,8 +16,8 @@ export async function getStopsByRoute(routeId: string) {
 
   let { data, error } = await supabase
     .rpc('get', { 
-      route_num: '123', 
-      direction_num: 0 
+      route_num: routeId, 
+      direction_num: direction 
     });
 
   if (error) {
