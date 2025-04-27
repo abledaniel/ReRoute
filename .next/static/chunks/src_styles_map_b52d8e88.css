@@ -1,0 +1,115 @@
+/* [project]/src/styles/map.css [app-client] (css) */
+.map-container {
+  flex: 2;
+  height: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px #0000001a;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.map-wrapper {
+  flex: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  min-height: calc(100vh - 150px);
+}
+
+.map-inner {
+  height: 100%;
+  width: 100%;
+}
+
+.map-styles {
+  --map-background: #242f3e;
+  --map-text: #746855;
+  --map-poi: #d59563;
+  --map-park: #263c3f;
+  --map-park-text: #6b9a76;
+  --map-road: #38414e;
+  --map-road-stroke: #212a37;
+  --map-road-text: #9ca5b3;
+  --map-highway: #746855;
+  --map-highway-stroke: #1f2835;
+  --map-highway-text: #f3d19c;
+  --map-transit: #2f3948;
+  --map-transit-station: #d59563;
+  --map-water: #17263c;
+  --map-water-text: #515c6d;
+}
+
+.custom-marker {
+  background-color: #228b22;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px #0000004d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.info-window {
+  padding: 8px;
+}
+
+.info-window-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #000;
+}
+
+.info-window-text {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.map-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
+.directions-polyline {
+  stroke-color: #2563eb;
+  stroke-weight: 5;
+}
+
+.bus-stop-marker {
+  path: circle;
+  scale: 8;
+  fillColor: gray;
+  fillOpacity: .8;
+  strokeColor: #fff;
+  strokeWeight: 2;
+}
+
+.vehicle-marker {
+  path: circle;
+  scale: 10;
+  fillColor: red;
+  fillOpacity: .9;
+  strokeColor: #fff;
+  strokeWeight: 2;
+}
+
+.nearest-stop-marker {
+  path: circle;
+  scale: 10;
+  fillColor: #4285f4;
+  fillOpacity: .8;
+  strokeColor: #fff;
+  strokeWeight: 2;
+}
+
+/*# sourceMappingURL=src_styles_map_b52d8e88.css.map*/

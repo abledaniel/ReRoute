@@ -1,0 +1,86 @@
+/* [project]/src/styles/directions.css [app-client] (css) */
+.map-container {
+  border-radius: 10px;
+  flex-direction: column;
+  flex: 2;
+  height: calc(100vh - 150px);
+  display: flex;
+  overflow: hidden;
+  box-shadow: 0 4px 6px #0000001a;
+}
+
+.map-wrapper {
+  border-radius: 10px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.map-inner {
+  width: 100%;
+  height: 100%;
+}
+
+.directions-sidebar {
+  flex-direction: column;
+  flex: 1;
+  gap: 32px;
+  max-height: calc(100vh - 150px);
+  display: flex;
+  overflow-y: auto;
+}
+
+.directions-container {
+  background: linear-gradient(to right, #1e3c72, #2a5298);
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 2px 4px #0000001a;
+}
+
+.directions-step {
+  background: #ffffff1a;
+  border-radius: 10px;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  display: flex;
+}
+
+.step-number {
+  color: #fff;
+  background: #2563eb;
+  border-radius: 50%;
+  flex-shrink: 0;
+  justify-content: center;
+  align-items: center;
+  width: 24px;
+  height: 24px;
+  display: flex;
+}
+
+.step-details {
+  color: #93c5fd;
+  margin-top: 8px;
+}
+
+.route-info {
+  flex-direction: column;
+  gap: 16px;
+  display: flex;
+}
+
+.custom-marker {
+  color: #fff;
+  background-color: #228b22;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  justify-content: center;
+  align-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  box-shadow: 0 2px 6px #0000004d;
+}
+
+/*# sourceMappingURL=src_styles_directions_css_f9ee138c._.single.css.map*/
