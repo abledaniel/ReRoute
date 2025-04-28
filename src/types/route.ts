@@ -34,8 +34,18 @@ export interface Stop {
   route_stop_order?: number;
 }
 
+export interface TransitlandVehicle {
+  trip_id: string;
+  route_id: string;
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+}
+
 export interface Vehicle {
   vehicle_id: string;
+  trip_id: string;
+  route_id: string;
   current_status: string;
   current_stop_sequence: number;
   stop_id: string;
@@ -46,11 +56,4 @@ export interface Vehicle {
   timestamp: string;
   congestion_level: number;
   speed: number;
-  route_id: string;
-  route_name?: string;
-  stop_name?: string;
-  next_stop_id?: string;
-  next_stop_name?: string;
-  next_stop_arrival?: string;
-  next_stop_departure?: string;
 }

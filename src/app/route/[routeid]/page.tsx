@@ -3,17 +3,18 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useJsApiLoader } from "@react-google-maps/api";
-import { getStopsByRoute } from '@/lib/supabase';
-import { Route, Stop, Vehicle } from '@/types/route';
+import { Route, Stop, Vehicle, TransitlandVehicle } from '@/types/route';
 import RouteMap from '@/components/routemap';
 import StopsList from '@/components/stops';
 import VehiclesList from '@/components/vehicles';
+import { createClient } from '@/utils/supabase/client';
 
 const RoutePage = () => {
   const params = useParams();
   const routeId = params?.routeid as string;
   
   const [route, setRoute] = useState<Route | null>(null);
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   const [stopsDirection0, setStopsDirection0] = useState<Stop[]>([]);
   const [stopsDirection1, setStopsDirection1] = useState<Stop[]>([]);
   const [activeDirection, setActiveDirection] = useState<number>(0);
@@ -21,6 +22,7 @@ const RoutePage = () => {
   const [error, setError] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 33.878840, lng: -117.884973 });
   const [routePath, setRoutePath] = useState<google.maps.LatLngLiteral[]>([]);
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const mapRef = useRef<google.maps.Map | null>(null);
   const [selectedStop, setSelectedStop] = useState<Stop | null>(null);
   
@@ -45,19 +47,20 @@ const RoutePage = () => {
       console.log('Raw vehicle data:', data);
       
       // Transform the vehicles to match our expected format
-      const routeVehicles = (data.vehicles || []).map((vehicle: any) => ({
-        vehicle_id: vehicle.trip_id,
+      const routeVehicles = (data.vehicles || []).map((vehicleData: TransitlandVehicle) => ({
+        vehicle_id: vehicleData.trip_id,
+        trip_id: vehicleData.trip_id,
+        route_id: vehicleData.route_id,
         current_status: 'IN_TRANSIT',
         current_stop_sequence: 0,
         stop_id: '',
         current_position: {
-          lat: vehicle.latitude,
-          lon: vehicle.longitude
+          lat: vehicleData.latitude,
+          lon: vehicleData.longitude
         },
-        timestamp: new Date(vehicle.timestamp * 1000).toISOString(),
+        timestamp: new Date(vehicleData.timestamp * 1000).toISOString(),
         congestion_level: 0,
-        speed: 0,
-        route_id: vehicle.route_id
+        speed: 0
       }));
       
       console.log('Transformed vehicles:', routeVehicles);
@@ -73,106 +76,52 @@ const RoutePage = () => {
   }, [routeId]);
 
   useEffect(() => {
-    const fetchRouteData = async () => {
+    const fetchRouteDetails = async () => {
       try {
-        setLoading(true);
-        setError(null);
+        // Fetch route details from Supabase
+        const { data: routeData, error: routeError } = await createClient()
+          .from('routes')
+          .select('*')
+          .eq('route_id', routeId)
+          .single();
 
-        const apiKey = process.env.NEXT_PUBLIC_TRANSIT_LAND_API_KEY || '4i0HhaRLe0jBSotDmxETH05X2iwrgNcJ';
+        if (routeError) throw routeError;
+        setRoute(routeData);
+
+        // Fetch real-time vehicle data from Transit.land API
+        const response = await fetch(`https://transit.land/api/v2/rest/vehicles?route_id=${routeId}`);
+        if (!response.ok) throw new Error('Failed to fetch vehicle data');
         
-        const formattedRouteId = routeId.startsWith('r-9qh0-') ? routeId : `r-9qh0-${routeId}`;
-        
-        const response = await fetch(
-          `https://transit.land/api/v2/rest/routes/${formattedRouteId}?api_key=${apiKey}`
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch route details: ${response.status} ${response.statusText}`);
-        }
-
         const data = await response.json();
-        console.log('Route data:', data);
-
-        if (data.routes && data.routes.length > 0) {
-          const routeData = data.routes[0];
-          setRoute(routeData);
-
-          if (routeData.geometry && routeData.geometry.coordinates) {
-            const path = routeData.geometry.coordinates[0].map((coord: number[]) => ({
-              lat: coord[1],
-              lng: coord[0]
-            }));
-            setRoutePath(path);
-
-            if (path.length > 0) {
-              setMapCenter(path[0]);
-            }
-          }
-
-          if (routeData.route_stops && routeData.route_stops.length > 0) {
-            const stopsDirection0Response = await getStopsByRoute(routeId, 0);
-            const stopsDirection1Response = await getStopsByRoute(routeId, 1);
-            
-            const supabaseStopsDirection0 = new Map(
-              stopsDirection0Response.map((stop: Stop) => [stop.stop_id, stop])
-            );
-            const supabaseStopsDirection1 = new Map(
-              stopsDirection1Response.map((stop: Stop) => [stop.stop_id, stop])
-            );
-            
-            const processedStopsDirection0: Stop[] = [];
-            const processedStopsDirection1: Stop[] = [];
-            
-            routeData.route_stops.forEach((routeStop: { stop: { stop_id: string; stop_name: string; geometry: { coordinates: number[] } } }) => {
-              const stop = routeStop.stop;
-              const stopId = stop.stop_id;
-              
-              const supabaseStop0 = supabaseStopsDirection0.get(stopId) as Stop | undefined;
-              const supabaseStop1 = supabaseStopsDirection1.get(stopId) as Stop | undefined;
-              
-              const processedStop = {
-                stop_id: stopId,
-                stop_name: stop.stop_name,
-                stop_lat: Number(stop.geometry.coordinates[1]),
-                stop_lon: Number(stop.geometry.coordinates[0]),
-                next_departure_time: supabaseStop0?.next_departure_time || supabaseStop1?.next_departure_time,
-                route_stop_order: supabaseStop0?.route_stop_order || supabaseStop1?.route_stop_order || 0
-              };
-              
-              if (supabaseStopsDirection0.has(stopId)) {
-                processedStopsDirection0.push(processedStop);
-              }
-              
-              if (supabaseStopsDirection1.has(stopId)) {
-                processedStopsDirection1.push(processedStop);
-              }
-            });
-            
-            // Sort stops by route_stop_order
-            processedStopsDirection0.sort((a, b) => (a.route_stop_order || 0) - (b.route_stop_order || 0));
-            processedStopsDirection1.sort((a, b) => (a.route_stop_order || 0) - (b.route_stop_order || 0));
-            
-            setStopsDirection0(processedStopsDirection0);
-            setStopsDirection1(processedStopsDirection1);
-          } else {
-            const stopsDirection0Response = await getStopsByRoute(routeId, 0);
-            const stopsDirection1Response = await getStopsByRoute(routeId, 1);
-            
-            setStopsDirection0(stopsDirection0Response);
-            setStopsDirection1(stopsDirection1Response);
-          }
-        } else {
-          throw new Error('Route not found');
-        }
-      } catch (err) {
-        console.error('Error fetching route details:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch route details');
-      } finally {
-        setLoading(false);
+        console.log('Raw vehicle data:', data);
+        
+        // Transform the vehicles to match our expected format
+        const routeVehicles = (data.vehicles || []).map((vehicleData: TransitlandVehicle) => ({
+          vehicle_id: vehicleData.trip_id,
+          trip_id: vehicleData.trip_id,
+          route_id: vehicleData.route_id,
+          current_status: 'IN_TRANSIT',
+          current_stop_sequence: 0,
+          stop_id: '',
+          current_position: {
+            lat: vehicleData.latitude,
+            lon: vehicleData.longitude
+          },
+          timestamp: new Date(vehicleData.timestamp * 1000).toISOString(),
+          congestion_level: 0,
+          speed: 0
+        }));
+        
+        setVehicles(routeVehicles);
+      } catch (error) {
+        console.error('Error fetching route details:', error);
+        setError('Failed to load route details');
       }
     };
 
-    fetchRouteData();
+    if (routeId) {
+      fetchRouteDetails();
+    }
   }, [routeId]);
 
   useEffect(() => {

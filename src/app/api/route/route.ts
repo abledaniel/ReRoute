@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { Stop } from '@/types/route';
+import { createClient } from '@/utils/supabase/client';
+import { Stop, Route } from '@/types/route';
 
 export async function GET(request: Request) {
   try {
+    const supabase = createClient();
     const { searchParams } = new URL(request.url);
     const lat = searchParams.get('lat') || '33.8461618';
     const lng = searchParams.get('lng') || '-118.011091';
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     const data = await response.json();
     
     // For each route, fetch its stops and their directions
-    const routesWithStops = await Promise.all(data.routes.map(async (route: any) => {
+    const routesWithStops = await Promise.all(data.routes.map(async (route: Route) => {
       // Fetch stops for both directions
       const stopsDirection0 = await supabase.rpc('get_stops', { 
         direction_id: 0,

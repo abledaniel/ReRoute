@@ -1,9 +1,8 @@
 {
   "extends": "next/core-web-vitals",
   "rules": {
-    "@typescript-eslint/no-unused-vars": ["warn", {
-      "varsIgnorePattern": "^(router|busStops|isLoading|setIsLoading|error|setError|locationError)$",
-      "argsIgnorePattern": "^_"
+    "@typescript-eslint/no-unused-vars": ["error", {
+      "varsIgnorePattern": "^(setStopsDirection0|setStopsDirection1|setLoading|setMapCenter|setRoutePath)$"
     }],
     "react-hooks/exhaustive-deps": "warn"
   }
