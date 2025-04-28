@@ -4,11 +4,11 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const lat = searchParams.get('lat') || '33.8461618';
-    const lon = searchParams.get('lon') || '-118.011091';
-    const apiKey = '4i0HhaRLe0jBSotDmxETH05X2iwrgNcJ';
+    const lng = searchParams.get('lng') || '-118.011091';
+    const apiKey = process.env.NEXT_PUBLIC_TRANSIT_LAND_API_KEY;
     
     const response = await fetch(
-      `https://transit.land/api/v2/rest/routes?lat=${lat}&lon=${lon}&radius=5000&api_key=${apiKey}`,
+      `https://transit.land/api/v2/rest/routes?lat=${lat}&lon=${lng}&radius=1000&api_key=${apiKey}`,
       {
         headers: { 'Accept': 'application/json' },
         next: { revalidate: 60 }

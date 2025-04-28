@@ -10,7 +10,7 @@ import { Route } from "@/types/route";
 const Page = () => {
   const router = useRouter();
   const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
-  const defaultPosition = { lat: 33.878840, lng: -117.884973 }; // Default map center
+  const defaultPosition = { lat: 33.878840, lng: -117.884973 };
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -51,11 +51,9 @@ const Page = () => {
         if (status === google.maps.DirectionsStatus.OK && result) {
           setDirections(result);
           
-          // Extract route details for display
           if (result.routes && result.routes.length > 0 && result.routes[0].legs && result.routes[0].legs.length > 0) {
             const leg = result.routes[0].legs[0];
             
-            // Calculate estimated arrival time (current time + duration)
             const now = new Date();
             const durationInMinutes = leg.duration?.value ? Math.round(leg.duration.value / 60) : 0;
             const estimatedArrivalTime = new Date(now.getTime() + durationInMinutes * 60000);
@@ -64,14 +62,13 @@ const Page = () => {
             setRouteDetails({
               duration: leg.duration?.text || 'N/A',
               arrivalTime: formattedArrivalTime,
-              departureTime: 'N/A', // Not used anymore but keeping for compatibility
+              departureTime: 'N/A',
               distance: leg.distance?.text || 'N/A',
               steps: leg.steps || [],
               routeId: result.routes[0].legs[0].steps[0].transit_details?.line.vehicle?.name?.replace('OCTA BUS ', '') || ''
             });
           }
           
-          // Only adjust map bounds if it's the initial route calculation
           if (mapRef.current && result.routes[0] && initialLoadRef.current) {
             const bounds = new google.maps.LatLngBounds();
             result.routes[0].legs.forEach(leg => {
@@ -97,47 +94,18 @@ const Page = () => {
     }
   }, []);
 
-  // Debounced version of fetchRoutes to prevent excessive API calls
   const debouncedFetchRoutes = useCallback((lat: number, lng: number) => {
-    // Clear any existing timer
     if (debounceTimer) {
       clearTimeout(debounceTimer);
     }
     
-    // Set a new timer
     const timer = setTimeout(() => {
       fetchRoutes(lat, lng, setRoutes);
-    }, 1000); // 1 second debounce
+    }, 1000); 
     
     setDebounceTimer(timer);
   }, [debounceTimer, fetchRoutes, setRoutes]);
 
-  // Separate function to handle location updates
-  const handleLocationUpdate = useCallback((position: GeolocationPosition) => {
-    const newPosition = {
-      lat: Number(position.coords.latitude.toFixed(9)),
-      lng: Number(position.coords.longitude.toFixed(9)),
-    };
-    
-    // Only update user position and map center on initial load
-    if (initialLoadRef.current) {
-      setUserPosition(newPosition);
-      setMapCenter(newPosition);
-      initialLoadRef.current = false;
-    }
-    
-    // Always fetch routes based on current map center, not user position
-    if (mapRef.current) {
-      const center = mapRef.current.getCenter();
-      if (center) {
-        debouncedFetchRoutes(center.lat(), center.lng());
-      }
-    }
-    
-    setLocationError(null);
-  }, [debouncedFetchRoutes]);
-
-  // Function to handle map center changes
   const handleMapCenterChanged = useCallback(() => {
     if (mapRef.current) {
       const center = mapRef.current.getCenter();
@@ -152,102 +120,27 @@ const Page = () => {
     }
   }, [debouncedFetchRoutes]);
 
-  // Function to update the advanced marker
-  const updateUserMarker = useCallback(() => {
-    if (!mapRef.current || !userPosition || !window.google || !window.google.maps || !window.google.maps.marker) {
-      console.log("Cannot create marker - missing dependencies:", {
-        map: !!mapRef.current,
-        userPosition: !!userPosition,
-        google: !!window.google,
-        maps: !!(window.google && window.google.maps),
-        marker: !!(window.google && window.google.maps && window.google.maps.marker)
-      });
-      
-      // Fallback to standard marker if advanced marker fails
-      if (mapRef.current && userPosition && window.google && window.google.maps) {
-        // Remove existing marker if it exists
-        if (markerRef.current) {
-          if ('setMap' in markerRef.current) {
-            markerRef.current.setMap(null);
-          } else {
-            markerRef.current.map = null;
-          }
-        }
-        
-        // Create a standard marker as fallback
-        const standardMarker = new window.google.maps.Marker({
-          position: userPosition,
-          map: mapRef.current,
-          title: "Your Location",
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: "#c5acff", // Purple color
-            fillOpacity: 1,
-            strokeColor: "#FFFFFF",
-            strokeWeight: 2,
-          }
-        });
-        
-        markerRef.current = standardMarker;
-        console.log("Standard marker created as fallback");
-      }
-      
-      return;
+  const handleLocationUpdate = useCallback((position: GeolocationPosition) => {
+    const newPosition = {
+      lat: Number(position.coords.latitude.toFixed(9)),
+      lng: Number(position.coords.longitude.toFixed(9)),
+    };
+    
+    if (initialLoadRef.current) {
+      setUserPosition(newPosition);
+      setMapCenter(newPosition);
+      initialLoadRef.current = false;
     }
+    
+    setLocationError(null);
+  }, []);
 
-    try {
-      // Remove existing marker if it exists
-      if (markerRef.current) {
-        if ('setMap' in markerRef.current) {
-          markerRef.current.setMap(null);
-        } else {
-          markerRef.current.map = null;
-        }
-      }
-
-      // Create a new advanced marker
-      const markerView = new window.google.maps.marker.AdvancedMarkerElement({
-        map: mapRef.current,
-        position: userPosition,
-        title: "Your Location",
-        content: createMarkerContent(),
-      });
-
-      markerRef.current = markerView;
-      console.log("Advanced marker created successfully");
-    } catch (error) {
-      console.error("Error creating advanced marker:", error);
-      
-      // Fallback to standard marker if advanced marker fails
-      if (mapRef.current && userPosition && window.google && window.google.maps) {
-        const standardMarker = new window.google.maps.Marker({
-          position: userPosition,
-          map: mapRef.current,
-          title: "Your Location",
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: "#c5acff", // Purple color
-            fillOpacity: 1,
-            strokeColor: "#FFFFFF",
-            strokeWeight: 2,
-          }
-        });
-        
-        markerRef.current = standardMarker;
-        console.log("Standard marker created as fallback after error");
-      }
-    }
-  }, [userPosition]);
-
-  // Function to create custom marker content
   const createMarkerContent = () => {
     const div = document.createElement('div');
     div.className = 'custom-marker';
     div.innerHTML = `
             <div style="
-                background-color: #c5acff; /* Purple color */
+                background-color: #c5acff;
                 border-radius: 50%;
                 width: 20px;
                 height: 20px;
@@ -266,7 +159,88 @@ const Page = () => {
     return div;
   };
 
-  // Update marker when user position changes
+  const updateUserMarker = useCallback(() => {
+    if (!mapRef.current || !userPosition || !window.google || !window.google.maps || !window.google.maps.marker) {
+      console.log("Cannot create marker - missing dependencies:", {
+        map: !!mapRef.current,
+        userPosition: !!userPosition,
+        google: !!window.google,
+        maps: !!(window.google && window.google.maps),
+        marker: !!(window.google && window.google.maps && window.google.maps.marker)
+      });
+      
+      if (mapRef.current && userPosition && window.google && window.google.maps) {
+        if (markerRef.current) {
+          if ('setMap' in markerRef.current) {
+            markerRef.current.setMap(null);
+          } else {
+            markerRef.current.map = null;
+          }
+        }
+        
+        const standardMarker = new window.google.maps.Marker({
+          position: userPosition,
+          map: mapRef.current,
+          title: "Your Location",
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: "#c5acff",
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+          }
+        });
+        
+        markerRef.current = standardMarker;
+        console.log("Standard marker created as fallback");
+      }
+      
+      return;
+    }
+
+    try {
+      if (markerRef.current) {
+        if ('setMap' in markerRef.current) {
+          markerRef.current.setMap(null);
+        } else {
+          markerRef.current.map = null;
+        }
+      }
+
+      const markerView = new window.google.maps.marker.AdvancedMarkerElement({
+        map: mapRef.current,
+        position: userPosition,
+        title: "Your Location",
+        content: createMarkerContent(),
+      });
+
+      markerRef.current = markerView;
+      console.log("Advanced marker created successfully");
+    } catch (error) {
+      console.error("Error creating advanced marker:", error);
+      
+      if (mapRef.current && userPosition && window.google && window.google.maps) {
+        const standardMarker = new window.google.maps.Marker({
+          position: userPosition,
+          map: mapRef.current,
+          title: "Your Location",
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: "#c5acff",
+            fillOpacity: 1,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+          }
+        });
+        
+        markerRef.current = standardMarker;
+        console.log("Standard marker created as fallback after error");
+      }
+    }
+  }, [userPosition]);
+
   useEffect(() => {
     if (isLoaded && userPosition) {
       const timer = setTimeout(updateUserMarker, 500);
@@ -274,27 +248,14 @@ const Page = () => {
     }
   }, [isLoaded, userPosition, updateUserMarker]);
 
-  // Fetch routes when map center changes - but only if it's a significant change
   useEffect(() => {
-    if (isLoaded && mapCenter) {
-      // Only fetch if the map has been loaded and the center has changed significantly
-      if (mapRef.current) {
-        debouncedFetchRoutes(mapCenter.lat, mapCenter.lng);
-      }
-    }
-  }, [isLoaded, mapCenter, debouncedFetchRoutes]);
-
-  useEffect(() => {
-    // Immediately fetch routes with default position only once
     fetchRoutes(defaultPosition.lat, defaultPosition.lng, setRoutes);
 
-    // Get initial position
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         handleLocationUpdate,
         (error) => {
           console.error("Error getting high-accuracy location:", error);
-          // Fallback to low-accuracy if high-accuracy fails
           navigator.geolocation.getCurrentPosition(
             handleLocationUpdate,
             (error) => {
@@ -315,7 +276,6 @@ const Page = () => {
         }
       );
 
-      // Set up continuous watching with more relaxed parameters
       const watchId = navigator.geolocation.watchPosition(
         handleLocationUpdate,
         (error) => {
@@ -324,14 +284,13 @@ const Page = () => {
         },
         {
           enableHighAccuracy: true,
-          maximumAge: 60000, // Accept positions up to 1 minute old
-          timeout: 30000, // Wait up to 30 seconds for a position
+          maximumAge: 60000, 
+          timeout: 30000, 
         }
       );
 
       return () => {
         navigator.geolocation.clearWatch(watchId);
-        // Clean up marker when component unmounts
         if (markerRef.current) {
           if ('setMap' in markerRef.current) {
             markerRef.current.setMap(null);
@@ -345,29 +304,24 @@ const Page = () => {
     }
   }, [defaultPosition.lat, defaultPosition.lng, handleLocationUpdate, fetchRoutes]);
 
-  // Function to handle route click
   const handleRouteClick = (routeId: string) => {
     router.push(`/route/${routeId}`);
   };
 
   useEffect(() => {
     if (isLoaded && originInputRef.current && destinationInputRef.current) {
-      // Initialize autocomplete for origin
       const originAutocompleteInstance = new google.maps.places.Autocomplete(originInputRef.current, {
         types: ['establishment', 'geocode'],
         componentRestrictions: { country: 'us' }
       });
 
-      // Initialize autocomplete for destination
       const destinationAutocompleteInstance = new google.maps.places.Autocomplete(destinationInputRef.current, {
         types: ['establishment', 'geocode'],
         componentRestrictions: { country: 'us' }
       });
 
-      // Initialize directions service
       directionsService.current = new google.maps.DirectionsService();
 
-      // Add listeners for place selection
       originAutocompleteInstance.addListener('place_changed', () => {
         const place = originAutocompleteInstance.getPlace();
         if (place.geometry) {
@@ -386,7 +340,6 @@ const Page = () => {
     }
   }, [isLoaded, calculateRoute]);
 
-  // Function to navigate to directions page
   const goToDirections = () => {
     if (origin && destination && routeDetails) {
       const params = new URLSearchParams({
@@ -455,16 +408,13 @@ const Page = () => {
           </div>
         </div>
 
-        {/* Side-by-side layout */}
         <div style={{ display: "flex", gap: "32px" }}>
-          {/* Map Section - Left Side */}
           <div style={{ 
             flex: "1.5", 
             position: "relative",
             display: "flex",
             flexDirection: "column"
           }}>
-            {/* Transit Search Bar */}
             <div style={{
               padding: "16px",
               background: "rgba(255, 255, 255, 0.1)",
@@ -498,7 +448,6 @@ const Page = () => {
                         (position) => {
                           const lat = position.coords.latitude;
                           const lng = position.coords.longitude;
-                          // Reverse geocode to get address
                           const geocoder = new google.maps.Geocoder();
                           geocoder.geocode({ location: { lat, lng } }, (results, status) => {
                             if (status === "OK" && results?.[0]) {
@@ -578,7 +527,6 @@ const Page = () => {
               </button>
             </div>
 
-            {/* Location Error and Manual Location Button */}
             {locationError && (
               <div style={{
                 padding: "8px 16px",
@@ -623,7 +571,6 @@ const Page = () => {
               </div>
             )}
 
-            {/* Map */}
             <div className="map-container map-wrapper">
               <GoogleMap
                 zoom={14}
@@ -640,7 +587,6 @@ const Page = () => {
                 onLoad={(map) => {
                   mapRef.current = map;
                   if (userPosition && initialLoadRef.current) {
-                    // Add a small delay to ensure the marker library is fully loaded
                     setTimeout(() => {
                       updateUserMarker();
                     }, 500);
@@ -649,7 +595,6 @@ const Page = () => {
                 onDragEnd={handleMapCenterChanged}
                 onZoomChanged={handleMapCenterChanged}
               >
-                {/* Always show user location with a standard marker as backup */}
                 {userPosition && (
                   <Marker
                     position={userPosition}
@@ -664,7 +609,6 @@ const Page = () => {
                   />
                 )}
                 
-                {/* Display transit route */}
                 {directions && (
                   <DirectionsRenderer
                     directions={directions}
@@ -681,7 +625,6 @@ const Page = () => {
             </div>
           </div>
 
-          {/* Right Side: Routes List */}
           <div style={{
             flex: "1",
             display: "flex",
@@ -690,7 +633,6 @@ const Page = () => {
             overflowY: "auto",
             maxHeight: "calc(100vh - 150px)"
           }}>
-            {/* Route Details Section - Only shown when directions are available */}
             {routeDetails && (
               <div style={{
                 background: "linear-gradient(to right, #1e3c72, #2a5298)",
