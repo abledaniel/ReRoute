@@ -35,15 +35,32 @@ const RoutePage = () => {
 
   const fetchVehiclePositions = useCallback(async () => {
     try {
-      const response = await fetch(`https://reroute-server-sqz6.onrender.com/api/vehicle-positions/${routeId}`);
+      const response = await fetch(`http://127.0.0.1:5000/api/vehicle-positions/${routeId}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch vehicle data: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log('Raw vehicle data:', data);
       
-      const routeVehicles = data.vehicles || [];
+      // Transform the vehicles to match our expected format
+      const routeVehicles = (data.vehicles || []).map((vehicle: any) => ({
+        vehicle_id: vehicle.trip_id,
+        current_status: 'IN_TRANSIT',
+        current_stop_sequence: 0,
+        stop_id: '',
+        current_position: {
+          lat: vehicle.latitude,
+          lon: vehicle.longitude
+        },
+        timestamp: new Date(vehicle.timestamp * 1000).toISOString(),
+        congestion_level: 0,
+        speed: 0,
+        route_id: vehicle.route_id
+      }));
+      
+      console.log('Transformed vehicles:', routeVehicles);
       setVehicles(routeVehicles);
       
       const now = new Date();
@@ -110,11 +127,16 @@ const RoutePage = () => {
               const stop = routeStop.stop;
               const stopId = stop.stop_id;
               
+              const supabaseStop0 = supabaseStopsDirection0.get(stopId) as Stop | undefined;
+              const supabaseStop1 = supabaseStopsDirection1.get(stopId) as Stop | undefined;
+              
               const processedStop = {
                 stop_id: stopId,
                 stop_name: stop.stop_name,
                 stop_lat: Number(stop.geometry.coordinates[1]),
-                stop_lon: Number(stop.geometry.coordinates[0])
+                stop_lon: Number(stop.geometry.coordinates[0]),
+                next_departure_time: supabaseStop0?.next_departure_time || supabaseStop1?.next_departure_time,
+                route_stop_order: supabaseStop0?.route_stop_order || supabaseStop1?.route_stop_order || 0
               };
               
               if (supabaseStopsDirection0.has(stopId)) {
@@ -125,6 +147,10 @@ const RoutePage = () => {
                 processedStopsDirection1.push(processedStop);
               }
             });
+            
+            // Sort stops by route_stop_order
+            processedStopsDirection0.sort((a, b) => (a.route_stop_order || 0) - (b.route_stop_order || 0));
+            processedStopsDirection1.sort((a, b) => (a.route_stop_order || 0) - (b.route_stop_order || 0));
             
             setStopsDirection0(processedStopsDirection0);
             setStopsDirection1(processedStopsDirection1);

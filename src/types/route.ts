@@ -11,6 +11,14 @@ export interface Route {
     type: string;
   };
   route_stops?: Stop[];
+  direction0?: {
+    stop_name: string | null;
+    next_departure: string | null;
+  };
+  direction1?: {
+    stop_name: string | null;
+    next_departure: string | null;
+  };
 }
 
 export interface Stop {
@@ -22,6 +30,8 @@ export interface Stop {
   lon?: number;
   arrivalTime?: string;
   departureTime?: string;
+  next_departure_time?: string;
+  route_stop_order?: number;
 }
 
 export interface Vehicle {

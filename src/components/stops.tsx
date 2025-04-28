@@ -75,8 +75,8 @@ const StopsList: React.FC<StopsListProps> = ({
         </div>
       </div>
       <div style={{ textAlign: "right" }}>
-        <p style={{ color: stop.arrivalTime ? "#4ade80" : "#93c5fd" }}>
-          {stop.arrivalTime ? `Arrives: ${stop.arrivalTime}` : "No arrival time available"}
+        <p style={{ color: stop.next_departure_time ? "#4ade80" : "#93c5fd" }}>
+          {stop.next_departure_time ? `Next Departure: ${stop.next_departure_time}` : "No departure time available"}
         </p>
       </div>
     </div>

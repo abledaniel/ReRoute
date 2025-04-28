@@ -723,7 +723,22 @@ const Page = () => {
                         <div>
                           <div style={{ fontSize: "18px", fontWeight: "bold" }}>OCTA BUS {route.route_id}</div>
                           <div style={{ fontSize: "14px", marginTop: "5px", color: "#93c5fd" }}>{route.route_name}</div>
-                          <div style={{ fontSize: "12px", marginTop: "5px", color: "#93c5fd" }}>10 Minutes Arrival Prediction: 13 Minutes</div>
+                          {route.direction0?.stop_name && (
+                            <div style={{ fontSize: "12px", marginTop: "5px", color: "#93c5fd" }}>
+                              Direction 1: {route.direction0.stop_name}
+                              {route.direction0.next_departure && (
+                                <span style={{ color: "#4ade80" }}> - Next: {route.direction0.next_departure}</span>
+                              )}
+                            </div>
+                          )}
+                          {route.direction1?.stop_name && (
+                            <div style={{ fontSize: "12px", marginTop: "5px", color: "#93c5fd" }}>
+                              Direction 2: {route.direction1.stop_name}
+                              {route.direction1.next_departure && (
+                                <span style={{ color: "#4ade80" }}> - Next: {route.direction1.next_departure}</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div style={{ fontSize: "24px" }}>➔</div>
                       </div>

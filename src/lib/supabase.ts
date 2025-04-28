@@ -10,22 +10,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export async function getStopsByRoute(routeId: string, direction: number = 0) {
   if (!routeId) {
-    console.error("Route ID is required.");
     return [];
   }
 
   const { data, error } = await supabase
-    .rpc('get', { 
-      route_num: routeId, 
-      direction_num: direction 
+    .rpc('get_stops', { 
+      direction_id: direction,
+      route_num: routeId
     });
 
-  if (error) {
-    console.error('Error fetching stops:', error.message, error.details, error.code);
-    return [];
-  }
-
-  if (!data) return [];
+  if (error || !data) return [];
 
   return data.map((record: {
     stop_id: string;
@@ -33,11 +27,13 @@ export async function getStopsByRoute(routeId: string, direction: number = 0) {
     stop_name: string;
     stop_lat: number;
     stop_lon: number;
+    next_departure_time: string;
   }) => ({
     stop_id: record.stop_id,
     route_stop_order: record.route_stop_order,
     stop_name: record.stop_name,
     stop_lat: record.stop_lat,
-    stop_lon: record.stop_lon
+    stop_lon: record.stop_lon,
+    next_departure_time: record.next_departure_time
   }));
 }
