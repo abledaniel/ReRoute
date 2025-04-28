@@ -35,7 +35,7 @@ const RoutePage = () => {
 
   const fetchVehiclePositions = useCallback(async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/vehicle-positions/${routeId}`);
+      const response = await fetch(`https://reroute-server-sqz6.onrender.com/api/vehicle-positions/${routeId}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch vehicle data: ${response.status}`);
