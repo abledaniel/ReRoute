@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { GoogleMap, Marker, Polyline, InfoWindow } from "@react-google-maps/api";
 import { Route, Stop, Vehicle } from '@/types/route';
 import '@/styles/map.css';
@@ -37,6 +37,27 @@ const RouteMap: React.FC<RouteMapProps> = ({
   onStopClose,
   onVehicleClose,
 }) => {
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [initialCenter, setInitialCenter] = useState(mapCenter);
+
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setUserLocation(newLocation);
+          setInitialCenter(newLocation);
+        },
+        (error) => {
+          console.warn("Error getting user location:", error);
+        }
+      );
+    }
+  }, []);
+
   const mapOptions = {
     fullscreenControl: false,
     streetViewControl: false,
@@ -66,13 +87,22 @@ const RouteMap: React.FC<RouteMapProps> = ({
     strokeWeight: 2,
   });
 
+  const createUserLocationIcon = () => ({
+    path: google.maps.SymbolPath.CIRCLE,
+    scale: 12,
+    fillColor: "#c5acff",
+    fillOpacity: 0.9,
+    strokeColor: "#FFFFFF",
+    strokeWeight: 2,
+  });
+
   const currentStops = activeDirection === 0 ? stopsDirection0 : stopsDirection1;
 
   return (
     <div className="map-container map-wrapper">
       <GoogleMap
-        zoom={14}
-        center={mapCenter}
+        zoom={16}
+        center={initialCenter}
         mapContainerStyle={{ height: "100%", width: "100%" }}
         options={mapOptions}
         onLoad={onMapLoad}
@@ -85,6 +115,14 @@ const RouteMap: React.FC<RouteMapProps> = ({
               strokeOpacity: 0.8,
               strokeWeight: 4,
             }}
+          />
+        )}
+
+        {userLocation && (
+          <Marker
+            position={userLocation}
+            icon={createUserLocationIcon()}
+            title="Your Location"
           />
         )}
 
