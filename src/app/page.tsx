@@ -14,7 +14,6 @@ const Page = () => {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [locationError, setLocationError] = useState<string | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | google.maps.marker.AdvancedMarkerElement | null>(null);
   const [mapCenter, setMapCenter] = useState(defaultPosition);
@@ -106,20 +105,6 @@ const Page = () => {
     setDebounceTimer(timer);
   }, [debounceTimer, fetchRoutes, setRoutes]);
 
-  const handleMapCenterChanged = useCallback(() => {
-    if (mapRef.current) {
-      const center = mapRef.current.getCenter();
-      if (center) {
-        const newCenter = {
-          lat: Number(center.lat().toFixed(9)),
-          lng: Number(center.lng().toFixed(9))
-        };
-        setMapCenter(newCenter);
-        debouncedFetchRoutes(newCenter.lat, newCenter.lng);
-      }
-    }
-  }, [debouncedFetchRoutes]);
-
   const handleLocationUpdate = useCallback((position: GeolocationPosition) => {
     const newPosition = {
       lat: Number(position.coords.latitude.toFixed(9)),
@@ -130,10 +115,30 @@ const Page = () => {
       setUserPosition(newPosition);
       setMapCenter(newPosition);
       initialLoadRef.current = false;
+      debouncedFetchRoutes(newPosition.lat, newPosition.lng);
+    } else {
+      setUserPosition(newPosition);
+      if (!mapRef.current?.getBounds()) {
+        debouncedFetchRoutes(newPosition.lat, newPosition.lng);
+      }
     }
-    
-    setLocationError(null);
-  }, []);
+  }, [debouncedFetchRoutes]);
+
+  const handleMapCenterChanged = useCallback(() => {
+    if (mapRef.current) {
+      const center = mapRef.current.getCenter();
+      if (center) {
+        const newCenter = {
+          lat: Number(center.lat().toFixed(9)),
+          lng: Number(center.lng().toFixed(9))
+        };
+        if (mapRef.current.getBounds()) {
+          setMapCenter(newCenter);
+          debouncedFetchRoutes(newCenter.lat, newCenter.lng);
+        }
+      }
+    }
+  }, [debouncedFetchRoutes]);
 
   const createMarkerContent = () => {
     const div = document.createElement('div');
@@ -249,60 +254,24 @@ const Page = () => {
   }, [isLoaded, userPosition, updateUserMarker]);
 
   useEffect(() => {
-    fetchRoutes(defaultPosition.lat, defaultPosition.lng, setRoutes);
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        handleLocationUpdate,
-        (error) => {
-          console.error("Error getting high-accuracy location:", error);
-          navigator.geolocation.getCurrentPosition(
-            handleLocationUpdate,
-            (error) => {
-              setLocationError(`Error getting location: ${error.message}`);
-              console.error("Error getting low-accuracy location:", error);
-            },
-            {
-              enableHighAccuracy: false,
-              maximumAge: 60000,
-              timeout: 30000,
-            }
-          );
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 30000,
-          timeout: 27000,
-        }
-      );
-
+    if ("geolocation" in navigator) {
       const watchId = navigator.geolocation.watchPosition(
         handleLocationUpdate,
         (error) => {
-          setLocationError(`Error tracking location: ${error.message}`);
-          console.error("Error watching location:", error);
+          console.error("Error getting location:", error);
         },
         {
           enableHighAccuracy: true,
-          maximumAge: 60000, 
-          timeout: 30000, 
+          timeout: 5000,
+          maximumAge: 0
         }
       );
 
       return () => {
         navigator.geolocation.clearWatch(watchId);
-        if (markerRef.current) {
-          if ('setMap' in markerRef.current) {
-            markerRef.current.setMap(null);
-          } else {
-            markerRef.current.map = null;
-          }
-        }
       };
-    } else {
-      setLocationError("Geolocation is not supported by your browser");
     }
-  }, [defaultPosition.lat, defaultPosition.lng, handleLocationUpdate, fetchRoutes]);
+  }, [handleLocationUpdate]);
 
   const handleRouteClick = (routeId: string) => {
     router.push(`/route/${routeId}`);
@@ -527,50 +496,6 @@ const Page = () => {
               </button>
             </div>
 
-            {locationError && (
-              <div style={{
-                padding: "8px 16px",
-                background: "rgba(255, 0, 0, 0.2)",
-                borderRadius: "6px",
-                margin: "0 16px 16px 16px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center"
-              }}>
-                <span style={{ color: "#ff6b6b" }}>{locationError}</span>
-                <button
-                  onClick={() => {
-                    if (navigator.geolocation) {
-                      navigator.geolocation.getCurrentPosition(
-                        handleLocationUpdate,
-                        (error) => {
-                          setLocationError(`Error getting location: ${error.message}`);
-                          console.error("Error getting location:", error);
-                        },
-                        {
-                          enableHighAccuracy: true,
-                          maximumAge: 0,
-                          timeout: 5000,
-                        }
-                      );
-                    }
-                  }}
-                  style={{
-                    padding: "8px 12px",
-                    background: "#228B22",
-                    border: "none",
-                    borderRadius: "4px",
-                    color: "white",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    fontWeight: "bold"
-                  }}
-                >
-                  Try Again
-                </button>
-              </div>
-            )}
-
             <div className="map-container map-wrapper">
               <GoogleMap
                 zoom={14}
@@ -693,7 +618,7 @@ const Page = () => {
               </div>
               <div style={{ flex: 1, overflowY: "auto" }}>
                 {routes.length === 0 ? (
-                  <p style={{ color: "#93c5fd" }}>No nearby routes found. {locationError ? `Error: ${locationError}` : ''}</p>
+                  <p style={{ color: "#93c5fd" }}>No nearby routes found.</p>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                     {routes.map((route) => (
@@ -727,7 +652,7 @@ const Page = () => {
                             <div style={{ fontSize: "12px", marginTop: "5px", color: "#93c5fd" }}>
                               Direction 1: {route.direction0.stop_name}
                               {route.direction0.next_departure && (
-                                <span style={{ color: "#4ade80" }}> - Next: {route.direction0.next_departure}</span>
+                                <span style={{ color: "#4ade80", fontWeight: "bold" }}> - Next: {route.direction0.next_departure}</span>
                               )}
                             </div>
                           )}
@@ -735,7 +660,7 @@ const Page = () => {
                             <div style={{ fontSize: "12px", marginTop: "5px", color: "#93c5fd" }}>
                               Direction 2: {route.direction1.stop_name}
                               {route.direction1.next_departure && (
-                                <span style={{ color: "#4ade80" }}> - Next: {route.direction1.next_departure}</span>
+                                <span style={{ color: "#4ade80", fontWeight: "bold" }}> - Next: {route.direction1.next_departure}</span>
                               )}
                             </div>
                           )}

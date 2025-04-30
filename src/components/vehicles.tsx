@@ -68,8 +68,7 @@ const VehiclesList: React.FC<VehiclesListProps> = ({
         </div>
       </div>
       <div style={{ textAlign: "right" }}>
-        <p style={{ color: "#4ade80" }}>Speed: {vehicle.speed ? `${vehicle.speed} mph` : 'N/A'}</p>
-        <p style={{ fontSize: "12px", color: "#93c5fd" }}>Updated: {vehicle.timestamp || 'N/A'}</p>
+        <p style={{ fontSize: "12px", color: "#4ade80", fontWeight: "bold" }}>Updated: {vehicle.timestamp || 'N/A'}</p>
       </div>
     </div>
   );

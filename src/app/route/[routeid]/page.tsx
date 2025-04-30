@@ -87,7 +87,8 @@ const RoutePage = () => {
         );
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch route details: ${response.status} ${response.statusText}`);
+          console.warn(`Warning: Failed to fetch route details: ${response.status} ${response.statusText}`);
+          // Continue with available data instead of throwing error
         }
 
         const data = await response.json();
@@ -110,63 +111,78 @@ const RoutePage = () => {
             }
           }
 
-          if (routeData.route_stops && routeData.route_stops.length > 0) {
-            const stopsDirection0Response = await getStopsByRoute(routeId, 0);
-            const stopsDirection1Response = await getStopsByRoute(routeId, 1);
-            
-            const supabaseStopsDirection0 = new Map(
-              stopsDirection0Response.map((stop: Stop) => [stop.stop_id, stop])
-            );
-            const supabaseStopsDirection1 = new Map(
-              stopsDirection1Response.map((stop: Stop) => [stop.stop_id, stop])
-            );
-            
-            const processedStopsDirection0: Stop[] = [];
-            const processedStopsDirection1: Stop[] = [];
-            
-            routeData.route_stops.forEach((routeStop: { stop: { stop_id: string; stop_name: string; geometry: { coordinates: number[] } } }) => {
-              const stop = routeStop.stop;
-              const stopId = stop.stop_id;
+          try {
+            if (routeData.route_stops && routeData.route_stops.length > 0) {
+              const stopsDirection0Response = await getStopsByRoute(routeId, 0);
+              const stopsDirection1Response = await getStopsByRoute(routeId, 1);
               
-              const supabaseStop0 = supabaseStopsDirection0.get(stopId) as Stop | undefined;
-              const supabaseStop1 = supabaseStopsDirection1.get(stopId) as Stop | undefined;
+              const supabaseStopsDirection0 = new Map(
+                stopsDirection0Response.map((stop: Stop) => [stop.stop_id, stop])
+              );
+              const supabaseStopsDirection1 = new Map(
+                stopsDirection1Response.map((stop: Stop) => [stop.stop_id, stop])
+              );
               
-              const processedStop = {
-                stop_id: stopId,
-                stop_name: stop.stop_name,
-                stop_lat: Number(stop.geometry.coordinates[1]),
-                stop_lon: Number(stop.geometry.coordinates[0]),
-                next_departure_time: supabaseStop0?.next_departure_time || supabaseStop1?.next_departure_time,
-                route_stop_order: supabaseStop0?.route_stop_order || supabaseStop1?.route_stop_order || 0
-              };
+              const processedStopsDirection0: Stop[] = [];
+              const processedStopsDirection1: Stop[] = [];
               
-              if (supabaseStopsDirection0.has(stopId)) {
-                processedStopsDirection0.push(processedStop);
-              }
+              routeData.route_stops.forEach((routeStop: { stop: { stop_id: string; stop_name: string; geometry: { coordinates: number[] } } }) => {
+                const stop = routeStop.stop;
+                const stopId = stop.stop_id;
+                
+                const supabaseStop0 = supabaseStopsDirection0.get(stopId) as Stop | undefined;
+                const supabaseStop1 = supabaseStopsDirection1.get(stopId) as Stop | undefined;
+                
+                const processedStop = {
+                  stop_id: stopId,
+                  stop_name: stop.stop_name,
+                  stop_lat: Number(stop.geometry.coordinates[1]),
+                  stop_lon: Number(stop.geometry.coordinates[0]),
+                  next_departure_time: supabaseStop0?.next_departure_time || supabaseStop1?.next_departure_time,
+                  route_stop_order: supabaseStop0?.route_stop_order || supabaseStop1?.route_stop_order || 0
+                };
+                
+                if (supabaseStopsDirection0.has(stopId)) {
+                  processedStopsDirection0.push(processedStop);
+                }
+                
+                if (supabaseStopsDirection1.has(stopId)) {
+                  processedStopsDirection1.push(processedStop);
+                }
+              });
               
-              if (supabaseStopsDirection1.has(stopId)) {
-                processedStopsDirection1.push(processedStop);
-              }
-            });
-            
-            processedStopsDirection0.sort((a, b) => (a.route_stop_order || 0) - (b.route_stop_order || 0));
-            processedStopsDirection1.sort((a, b) => (a.route_stop_order || 0) - (b.route_stop_order || 0));
-            
-            setStopsDirection0(processedStopsDirection0);
-            setStopsDirection1(processedStopsDirection1);
-          } else {
+              processedStopsDirection0.sort((a, b) => (a.route_stop_order || 0) - (b.route_stop_order || 0));
+              processedStopsDirection1.sort((a, b) => (a.route_stop_order || 0) - (b.route_stop_order || 0));
+              
+              setStopsDirection0(processedStopsDirection0);
+              setStopsDirection1(processedStopsDirection1);
+            } else {
+              const stopsDirection0Response = await getStopsByRoute(routeId, 0);
+              const stopsDirection1Response = await getStopsByRoute(routeId, 1);
+              
+              setStopsDirection0(stopsDirection0Response);
+              setStopsDirection1(stopsDirection1Response);
+            }
+          } catch (stopsError) {
+            console.warn('Warning: Failed to fetch stops data:', stopsError);
+            // Continue without stops data
+          }
+        } else {
+          console.warn('Warning: Route not found in Transit.land API');
+          // Try to fetch stops data anyway
+          try {
             const stopsDirection0Response = await getStopsByRoute(routeId, 0);
             const stopsDirection1Response = await getStopsByRoute(routeId, 1);
             
             setStopsDirection0(stopsDirection0Response);
             setStopsDirection1(stopsDirection1Response);
+          } catch (stopsError) {
+            console.warn('Warning: Failed to fetch stops data:', stopsError);
           }
-        } else {
-          throw new Error('Route not found');
         }
       } catch (err) {
-        console.error('Error fetching route details:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch route details');
+        console.warn('Warning: Error in route data fetch:', err);
+        // Don't set error state, just log the warning
       } finally {
         setLoading(false);
       }
@@ -219,28 +235,6 @@ const RoutePage = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div style={{ 
-        minHeight: "100vh", 
-        display: "flex", 
-        flexDirection: "column", 
-        justifyContent: "center", 
-        alignItems: "center",
-        background: "linear-gradient(to right, #1e3c72, #2a5298)", 
-        color: "white", 
-        padding: "20px",
-        textAlign: "center"
-      }}>
-        <h2>Error Loading Route</h2>
-        <p>{error}</p>
-        <Link href="/" style={{ color: "#4ade80", marginTop: "20px" }}>
-          Return to Home
-        </Link>
-      </div>
-    );
-  }
-
   return (
     <div style={{ 
       minHeight: "100vh", 
@@ -279,6 +273,18 @@ const RoutePage = () => {
           </div>
         </div>
 
+        {error && (
+          <div style={{
+            padding: "12px",
+            background: "rgba(255, 0, 0, 0.1)",
+            borderRadius: "6px",
+            marginBottom: "16px",
+            color: "#ff6b6b"
+          }}>
+            <p>Some information may be unavailable: {error}</p>
+          </div>
+        )}
+
         <div style={{ 
           display: "flex", 
           gap: "24px", 
@@ -304,7 +310,7 @@ const RoutePage = () => {
               <h1 style={{ fontSize: "24px", marginBottom: "8px" }}>
                 {route?.route_long_name || `Route ${routeId}`}
               </h1>
-              <p style={{ fontSize: "14px", color: "#93c5fd" }}>
+              <p style={{ fontSize: "14px", color: "#4ade80", fontWeight: "bold" }}>
                 Last Updated: {lastUpdated}
               </p>
             </div>
@@ -331,22 +337,29 @@ const RoutePage = () => {
             flex: "1",
             display: "flex",
             flexDirection: "column",
-            gap: "24px",
-            overflowY: "auto"
+            overflowY: "auto",
+            maxHeight: "calc(100vh - 100px)",
+            padding: "16px",
+            background: "rgba(0, 0, 0, 0.2)",
+            borderRadius: "10px"
           }}>
-            <VehiclesList
-              vehicles={vehicles}
-              onVehicleSelect={setSelectedVehicle}
-              onRefresh={fetchVehiclePositions}
-            />
+            <div style={{ marginBottom: "24px" }}>
+              <VehiclesList
+                vehicles={vehicles}
+                onVehicleSelect={setSelectedVehicle}
+                onRefresh={fetchVehiclePositions}
+              />
+            </div>
 
-            <StopsList
-              activeDirection={activeDirection}
-              stopsDirection0={stopsDirection0}
-              stopsDirection1={stopsDirection1}
-              onStopSelect={setSelectedStop}
-              onDirectionChange={setActiveDirection}
-            />
+            <div>
+              <StopsList
+                activeDirection={activeDirection}
+                stopsDirection0={stopsDirection0}
+                stopsDirection1={stopsDirection1}
+                onStopSelect={setSelectedStop}
+                onDirectionChange={setActiveDirection}
+              />
+            </div>
           </div>
         </div>
       </div>
