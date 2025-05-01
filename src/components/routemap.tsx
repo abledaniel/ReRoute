@@ -163,6 +163,9 @@ const RouteMap: React.FC<RouteMapProps> = ({
             <div className="info-window">
               <h3 className="info-window-title">{selectedStop.stop_name}</h3>
               <p className="info-window-text">Stop ID: {selectedStop.stop_id}</p>
+              <p className="info-window-text" style={{ color: selectedStop.next_departure_time ? "#4ade80" : "#93c5fd" }}>
+                {selectedStop.next_departure_time ? `Next Departure: ${selectedStop.next_departure_time}` : "No departure time available"}
+              </p>
             </div>
           </InfoWindow>
         )}

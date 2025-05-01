@@ -18,26 +18,7 @@ const FAQPage = () => {
           </Link>
           <div style={{ marginLeft: "auto" }}>
             <Link href="/map" style={{ textDecoration: "none" }}>
-              <button
-                style={{
-                  background: "rgba(255, 255, 255, 0.1)",
-                  border: "none",
-                  color: "#fff",
-                  padding: "8px 16px",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  transition: "background 0.2s"
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-                }}
-              >
-                Back to Map
-              </button>
+
             </Link>
           </div>
         </div>
