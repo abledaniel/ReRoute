@@ -105,30 +105,6 @@ const FAQPage = () => {
             </p>
           </div>
 
-          <div style={{ 
-            background: "rgba(0, 0, 0, 0.3)", 
-            borderRadius: "10px", 
-            padding: "20px"
-          }}>
-            <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>How accurate are the arrival predictions?</h3>
-            <p style={{ lineHeight: "1.6" }}>
-              ReRoute uses real-time data from the transit system&apos;s API to provide current information about bus locations. 
-              As more historical data is collected, machine learning models will be implemented to improve arrival time predictions, 
-              taking into account factors such as traffic patterns, time of day, and day of the week.
-            </p>
-          </div>
-
-          <div style={{ 
-            background: "rgba(0, 0, 0, 0.3)", 
-            borderRadius: "10px", 
-            padding: "20px"
-          }}>
-            <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>Is my location data used?</h3>
-            <p style={{ lineHeight: "1.6" }}>
-              ReRoute only uses your location when you explicitly allow it, such as when finding nearby bus routes or planning a trip from your current location. 
-              Your location data is not stored or shared with third parties.
-            </p>
-          </div>
 
           <div style={{ 
             background: "rgba(0, 0, 0, 0.3)", 
@@ -141,27 +117,6 @@ const FAQPage = () => {
             </p>
           </div>
 
-          <div style={{ 
-            background: "rgba(0, 0, 0, 0.3)", 
-            borderRadius: "10px", 
-            padding: "20px"
-          }}>
-            <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>Can I use ReRoute on my mobile device?</h3>
-            <p style={{ lineHeight: "1.6" }}>
-              Yes, ReRoute is designed to be responsive and work well on both desktop and mobile devices. You can access it through any web browser on your smartphone or tablet.
-            </p>
-          </div>
-
-          <div style={{ 
-            background: "rgba(0, 0, 0, 0.3)", 
-            borderRadius: "10px", 
-            padding: "20px"
-          }}>
-            <h3 style={{ fontSize: "18px", marginBottom: "12px" }}>How can I report an issue or provide feedback?</h3>
-            <p style={{ lineHeight: "1.6" }}>
-              If you encounter any issues or have suggestions for improving ReRoute, please contact us through the feedback form or email us at support@reroute.com.
-            </p>
-          </div>
         </div>
 
         <div style={{ 
