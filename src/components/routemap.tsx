@@ -1,8 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { GoogleMap, Marker, Polyline, InfoWindow } from "@react-google-maps/api";
 import { Route, Stop, Vehicle } from '@/types/route';
 import '@/styles/map.css';
 import { mapStyles } from '@/styles/mapstyle';
+
+const mapOptions = {
+  fullscreenControl: false,
+  streetViewControl: false,
+  mapTypeControl: false,
+  zoomControl: true,
+  gestureHandling: "greedy",
+  styles: mapStyles,
+};
 
 interface RouteMapProps {
   route: Route;
@@ -51,50 +60,43 @@ const RouteMap: React.FC<RouteMapProps> = ({
           setUserLocation(newLocation);
           setInitialCenter(newLocation);
         },
-        (error) => {
-          console.warn("Error getting user location:", error);
-        }
+        () => {}, // silent — map works fine centered on route without user location
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
       );
     }
   }, []);
 
-  const mapOptions = {
-    fullscreenControl: false,
-    streetViewControl: false,
-    mapTypeControl: false,
-    zoomControl: true,
-    gestureHandling: "greedy",
-    styles: mapStyles,
-  };
+  const routeColor = useMemo(
+    () => (route?.route_color ? `#${route.route_color}` : "#4285F4"),
+    [route?.route_color]
+  );
 
-  const routeColor = route?.route_color ? `#${route.route_color}` : "#4285F4";
-
-  const createStopIcon = () => ({
+  const stopIcon = useMemo(() => ({
     path: google.maps.SymbolPath.CIRCLE,
     scale: 8,
     fillColor: routeColor,
     fillOpacity: 0.8,
     strokeColor: "#FFFFFF",
     strokeWeight: 2,
-  });
+  }), [routeColor]);
 
-  const createVehicleIcon = () => ({
+  const vehicleIcon = useMemo(() => ({
     path: google.maps.SymbolPath.CIRCLE,
     scale: 10,
     fillColor: "#FF0000",
     fillOpacity: 0.9,
     strokeColor: "#FFFFFF",
     strokeWeight: 2,
-  });
+  }), []);
 
-  const createUserLocationIcon = () => ({
+  const userLocationIcon = useMemo(() => ({
     path: google.maps.SymbolPath.CIRCLE,
     scale: 12,
     fillColor: "#c5acff",
     fillOpacity: 0.9,
     strokeColor: "#FFFFFF",
     strokeWeight: 2,
-  });
+  }), []);
 
   const currentStops = activeDirection === 0 ? stopsDirection0 : stopsDirection1;
 
@@ -121,7 +123,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
         {userLocation && (
           <Marker
             position={userLocation}
-            icon={createUserLocationIcon()}
+            icon={userLocationIcon}
             title="Your Location"
           />
         )}
@@ -135,7 +137,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
             }}
             title={stop.stop_name}
             onClick={() => onStopSelect(stop)}
-            icon={createStopIcon()}
+            icon={stopIcon}
           />
         ))}
 
@@ -148,7 +150,7 @@ const RouteMap: React.FC<RouteMapProps> = ({
             }}
             title={`Vehicle ${vehicle.vehicle_id}`}
             onClick={() => onVehicleSelect(vehicle)}
-            icon={createVehicleIcon()}
+            icon={vehicleIcon}
           />
         ))}
 
@@ -182,7 +184,6 @@ const RouteMap: React.FC<RouteMapProps> = ({
               <h3 className="info-window-title">Vehicle {selectedVehicle.vehicle_id}</h3>
               <p className="info-window-text">Route: {selectedVehicle.route_id}</p>
               <p className="info-window-text">Status: {selectedVehicle.current_status || 'N/A'}</p>
-              <p className="info-window-text">Speed: {selectedVehicle.speed ? `${selectedVehicle.speed} mph` : 'N/A'}</p>
               <p className="info-window-text">Updated: {selectedVehicle.timestamp || 'N/A'}</p>
             </div>
           </InfoWindow>

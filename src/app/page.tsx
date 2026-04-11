@@ -7,6 +7,8 @@ import { mapStyles } from '@/styles/mapstyle';
 import Link from "next/link";
 import { Route } from "@/types/route";
 
+const MAPS_LIBRARIES: ("places" | "maps")[] = ["places", "maps"];
+
 const Page = () => {
   const router = useRouter();
   const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
@@ -15,7 +17,6 @@ const Page = () => {
   const [destination, setDestination] = useState("");
   const [routes, setRoutes] = useState<Route[]>([]);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.Marker | google.maps.marker.AdvancedMarkerElement | null>(null);
   const [mapCenter, setMapCenter] = useState(defaultPosition);
   const initialLoadRef = useRef(true);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
@@ -25,16 +26,14 @@ const Page = () => {
   const [routeDetails, setRouteDetails] = useState<{
     duration: string;
     arrivalTime: string;
-    departureTime: string;
     distance: string;
-    steps: google.maps.DirectionsStep[];
     routeId: string;
   } | null>(null);
-  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries: ["places", "maps"], 
+    libraries: MAPS_LIBRARIES,
   });
 
   const calculateRoute = useCallback(() => {
@@ -49,25 +48,20 @@ const Page = () => {
       (result, status) => {
         if (status === google.maps.DirectionsStatus.OK && result) {
           setDirections(result);
-          
-          if (result.routes && result.routes.length > 0 && result.routes[0].legs && result.routes[0].legs.length > 0) {
+
+          if (result.routes?.length > 0 && result.routes[0].legs?.length > 0) {
             const leg = result.routes[0].legs[0];
-            
-            const now = new Date();
             const durationInMinutes = leg.duration?.value ? Math.round(leg.duration.value / 60) : 0;
-            const estimatedArrivalTime = new Date(now.getTime() + durationInMinutes * 60000);
-            const formattedArrivalTime = estimatedArrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            
+            const estimatedArrival = new Date(Date.now() + durationInMinutes * 60000);
+
             setRouteDetails({
               duration: leg.duration?.text || 'N/A',
-              arrivalTime: formattedArrivalTime,
-              departureTime: 'N/A',
+              arrivalTime: estimatedArrival.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               distance: leg.distance?.text || 'N/A',
-              steps: leg.steps || [],
               routeId: result.routes[0].legs[0].steps[0].transit_details?.line.vehicle?.name?.replace('OCTA BUS ', '') || ''
             });
           }
-          
+
           if (mapRef.current && result.routes[0] && initialLoadRef.current) {
             const bounds = new google.maps.LatLngBounds();
             result.routes[0].legs.forEach(leg => {
@@ -94,183 +88,63 @@ const Page = () => {
   }, []);
 
   const debouncedFetchRoutes = useCallback((lat: number, lng: number) => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
-    
-    const timer = setTimeout(() => {
+    debounceTimerRef.current = setTimeout(() => {
       fetchRoutes(lat, lng, setRoutes);
-    }, 1000); 
-    
-    setDebounceTimer(timer);
-  }, [debounceTimer, fetchRoutes, setRoutes]);
+    }, 1000);
+  }, [fetchRoutes, setRoutes]);
 
   const handleLocationUpdate = useCallback((position: GeolocationPosition) => {
     const newPosition = {
       lat: Number(position.coords.latitude.toFixed(9)),
       lng: Number(position.coords.longitude.toFixed(9)),
     };
-    
+
+    setUserPosition(newPosition);
+
     if (initialLoadRef.current) {
-      setUserPosition(newPosition);
       setMapCenter(newPosition);
       initialLoadRef.current = false;
       debouncedFetchRoutes(newPosition.lat, newPosition.lng);
-    } else {
-      setUserPosition(newPosition);
-      if (!mapRef.current?.getBounds()) {
-        debouncedFetchRoutes(newPosition.lat, newPosition.lng);
-      }
     }
   }, [debouncedFetchRoutes]);
 
   const handleMapCenterChanged = useCallback(() => {
     if (mapRef.current) {
       const center = mapRef.current.getCenter();
-      if (center) {
+      if (center && mapRef.current.getBounds()) {
         const newCenter = {
           lat: Number(center.lat().toFixed(9)),
           lng: Number(center.lng().toFixed(9))
         };
-        if (mapRef.current.getBounds()) {
-          setMapCenter(newCenter);
-          debouncedFetchRoutes(newCenter.lat, newCenter.lng);
-        }
+        setMapCenter(newCenter);
+        debouncedFetchRoutes(newCenter.lat, newCenter.lng);
       }
     }
   }, [debouncedFetchRoutes]);
 
-  const createMarkerContent = () => {
-    const div = document.createElement('div');
-    div.className = 'custom-marker';
-    div.innerHTML = `
-            <div style="
-                background-color: #c5acff;
-                border-radius: 50%;
-                width: 20px;
-                height: 20px;
-                border: 2px solid white;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-weight: bold;
-                font-size: 12px;
-            ">
-                You
-            </div>
-        `;
-    return div;
-  };
-
-  const updateUserMarker = useCallback(() => {
-    if (!mapRef.current || !userPosition || !window.google || !window.google.maps || !window.google.maps.marker) {
-      console.log("Cannot create marker - missing dependencies:", {
-        map: !!mapRef.current,
-        userPosition: !!userPosition,
-        google: !!window.google,
-        maps: !!(window.google && window.google.maps),
-        marker: !!(window.google && window.google.maps && window.google.maps.marker)
-      });
-      
-      if (mapRef.current && userPosition && window.google && window.google.maps) {
-        if (markerRef.current) {
-          if ('setMap' in markerRef.current) {
-            markerRef.current.setMap(null);
-          } else {
-            markerRef.current.map = null;
-          }
-        }
-        
-        const standardMarker = new window.google.maps.Marker({
-          position: userPosition,
-          map: mapRef.current,
-          title: "Your Location",
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: "#c5acff",
-            fillOpacity: 1,
-            strokeColor: "#FFFFFF",
-            strokeWeight: 2,
-          }
-        });
-        
-        markerRef.current = standardMarker;
-        console.log("Standard marker created as fallback");
-      }
-      
-      return;
-    }
-
-    try {
-      if (markerRef.current) {
-        if ('setMap' in markerRef.current) {
-          markerRef.current.setMap(null);
-        } else {
-          markerRef.current.map = null;
-        }
-      }
-
-      const markerView = new window.google.maps.marker.AdvancedMarkerElement({
-        map: mapRef.current,
-        position: userPosition,
-        title: "Your Location",
-        content: createMarkerContent(),
-      });
-
-      markerRef.current = markerView;
-      console.log("Advanced marker created successfully");
-    } catch (error) {
-      console.error("Error creating advanced marker:", error);
-      
-      if (mapRef.current && userPosition && window.google && window.google.maps) {
-        const standardMarker = new window.google.maps.Marker({
-          position: userPosition,
-          map: mapRef.current,
-          title: "Your Location",
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: "#c5acff",
-            fillOpacity: 1,
-            strokeColor: "#FFFFFF",
-            strokeWeight: 2,
-          }
-        });
-        
-        markerRef.current = standardMarker;
-        console.log("Standard marker created as fallback after error");
-      }
-    }
-  }, [userPosition]);
-
   useEffect(() => {
-    if (isLoaded && userPosition) {
-      const timer = setTimeout(updateUserMarker, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoaded, userPosition, updateUserMarker]);
+    if (!("geolocation" in navigator)) return;
 
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      const watchId = navigator.geolocation.watchPosition(
-        handleLocationUpdate,
-        (error) => {
-          console.error("Error getting location:", error);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
+    navigator.geolocation.getCurrentPosition(
+      handleLocationUpdate,
+      (error) => {
+        if (error.code !== error.TIMEOUT) {
+          console.warn("Geolocation unavailable:", error.message);
         }
-      );
+      },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+    );
 
-      return () => {
-        navigator.geolocation.clearWatch(watchId);
-      };
-    }
+    const watchId = navigator.geolocation.watchPosition(
+      handleLocationUpdate,
+      () => {},
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [handleLocationUpdate]);
 
   const handleRouteClick = (routeId: string) => {
@@ -279,28 +153,28 @@ const Page = () => {
 
   useEffect(() => {
     if (isLoaded && originInputRef.current && destinationInputRef.current) {
-      const originAutocompleteInstance = new google.maps.places.Autocomplete(originInputRef.current, {
+      const originAutocomplete = new google.maps.places.Autocomplete(originInputRef.current, {
         types: ['establishment', 'geocode'],
         componentRestrictions: { country: 'us' }
       });
 
-      const destinationAutocompleteInstance = new google.maps.places.Autocomplete(destinationInputRef.current, {
+      const destinationAutocomplete = new google.maps.places.Autocomplete(destinationInputRef.current, {
         types: ['establishment', 'geocode'],
         componentRestrictions: { country: 'us' }
       });
 
       directionsService.current = new google.maps.DirectionsService();
 
-      originAutocompleteInstance.addListener('place_changed', () => {
-        const place = originAutocompleteInstance.getPlace();
+      originAutocomplete.addListener('place_changed', () => {
+        const place = originAutocomplete.getPlace();
         if (place.geometry) {
           setOrigin(place.formatted_address || '');
           calculateRoute();
         }
       });
 
-      destinationAutocompleteInstance.addListener('place_changed', () => {
-        const place = destinationAutocompleteInstance.getPlace();
+      destinationAutocomplete.addListener('place_changed', () => {
+        const place = destinationAutocomplete.getPlace();
         if (place.geometry) {
           setDestination(place.formatted_address || '');
           calculateRoute();
@@ -319,7 +193,6 @@ const Page = () => {
         distance: encodeURIComponent(routeDetails.distance),
         routeId: encodeURIComponent(routeDetails.routeId)
       });
-      
       router.push(`/directions?${params.toString()}`);
     }
   };
@@ -333,9 +206,7 @@ const Page = () => {
         padding: "32px"
       }}>
         <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "center", marginBottom: "32px" }}>
-            <h1 style={{ fontSize: "24px", fontWeight: "bold" }}>Loading map...</h1>
-          </div>
+          <h1 style={{ fontSize: "24px", fontWeight: "bold" }}>Loading map...</h1>
         </div>
       </div>
     );
@@ -355,35 +226,26 @@ const Page = () => {
             <Link href="/faq" style={{ textDecoration: "none" }}>
               <button
                 style={{
-                background: "rgba(255, 255, 255, 0.1)",
-                border: "none",
-                color: "#fff",
-                padding: "8px 16px",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontSize: "14px",
-                transition: "background 0.2s"
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-              }}
-            >
-              FAQ
-            </button>
+                  background: "rgba(255, 255, 255, 0.1)",
+                  border: "none",
+                  color: "#fff",
+                  padding: "8px 16px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  transition: "background 0.2s"
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)"; }}
+              >
+                FAQ
+              </button>
             </Link>
           </div>
         </div>
 
         <div style={{ display: "flex", gap: "32px" }}>
-          <div style={{ 
-            flex: "1.5", 
-            position: "relative",
-            display: "flex",
-            flexDirection: "column"
-          }}>
+          <div style={{ flex: "1.5", position: "relative", display: "flex", flexDirection: "column" }}>
             <div style={{
               padding: "16px",
               background: "rgba(255, 255, 255, 0.1)",
@@ -427,9 +289,7 @@ const Page = () => {
                             }
                           });
                         },
-                        (error) => {
-                          console.error("Error getting location:", error);
-                        }
+                        () => {}
                       );
                     }
                   }}
@@ -444,12 +304,8 @@ const Page = () => {
                     whiteSpace: "nowrap",
                     transition: "background 0.2s"
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)"; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)"; }}
                 >
                   📍 My Location
                 </button>
@@ -485,12 +341,8 @@ const Page = () => {
                   fontWeight: "bold",
                   transition: "background 0.2s"
                 }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "#60a5fa";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "#93c5fd";
-                }}
+                onMouseOver={(e) => { e.currentTarget.style.background = "#60a5fa"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "#93c5fd"; }}
               >
                 Search
               </button>
@@ -511,11 +363,7 @@ const Page = () => {
                 }}
                 onLoad={(map) => {
                   mapRef.current = map;
-                  if (userPosition && initialLoadRef.current) {
-                    setTimeout(() => {
-                      updateUserMarker();
-                    }, 500);
-                  }
+                  fetchRoutes(defaultPosition.lat, defaultPosition.lng, setRoutes);
                 }}
                 onDragEnd={handleMapCenterChanged}
                 onZoomChanged={handleMapCenterChanged}
@@ -533,7 +381,7 @@ const Page = () => {
                     }}
                   />
                 )}
-                
+
                 {directions && (
                   <DirectionsRenderer
                     directions={directions}
@@ -595,12 +443,8 @@ const Page = () => {
                     marginTop: "16px",
                     transition: "background 0.2s"
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#1d4ed8";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#2563eb";
-                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = "#1d4ed8"; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = "#2563eb"; }}
                 >
                   GO
                 </button>

@@ -3,18 +3,17 @@ import React, { useEffect, useState, useRef, useCallback, Suspense } from "react
 import { useJsApiLoader, GoogleMap, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import '@/styles/base.css';
-import '@/styles/directions.css';
-import '@/styles/map.css';
 import { mapStyles } from '@/styles/mapstyle';
+
+const MAPS_LIBRARIES: ("places" | "maps")[] = ["places", "maps"];
 
 const DirectionsPage = () => {
   return (
     <Suspense fallback={
       <div style={{
         minHeight: "100vh",
-        display: "flex", 
-        justifyContent: "center", 
+        display: "flex",
+        justifyContent: "center",
         alignItems: "center",
         background: "linear-gradient(to right, #1e3c72, #2a5298)",
         color: "white"
@@ -30,24 +29,22 @@ const DirectionsPage = () => {
 const DirectionsContent = () => {
   const searchParams = useSearchParams();
   const defaultPosition = { lat: 33.878840, lng: -117.884973 };
-  
+
   const [userPosition, setUserPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [mapCenter, setMapCenter] = useState(defaultPosition);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
-  const [routeStops, setRouteStops] = useState<{ stop_id: string; stop_name: string; lat: number; lng: number }[]>([]);
   const [routeDetails, setRouteDetails] = useState<{
     duration: string;
     arrivalTime: string;
     distance: string;
   } | null>(null);
-  
+
   const mapRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const directionsService = useRef<google.maps.DirectionsService | null>(null);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries: ["places", "maps"],
+    libraries: MAPS_LIBRARIES,
   });
 
   const handleLocationUpdate = useCallback((position: GeolocationPosition) => {
@@ -58,49 +55,6 @@ const DirectionsContent = () => {
     setUserPosition(newPosition);
     setMapCenter(newPosition);
   }, []);
-
-  const createUserMarker = useCallback(() => {
-    if (!mapRef.current || !userPosition || !window.google || !window.google.maps || !window.google.maps.marker) return;
-
-    try {
-      if (markerRef.current) markerRef.current.map = null;
-      
-      const markerView = new window.google.maps.marker.AdvancedMarkerElement({
-        map: mapRef.current,
-        position: userPosition,
-        title: "Your Location",
-        content: createMarkerContent(),
-      });
-
-      markerRef.current = markerView;
-    } catch (error) {
-      console.error("Error creating advanced marker:", error);
-    }
-  }, [userPosition]);
-
-  const createMarkerContent = () => {
-    const div = document.createElement('div');
-    div.className = 'custom-marker';
-    div.innerHTML = `
-      <div style="
-        background-color: #228B22;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        border: 2px solid white;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 12px;
-      ">
-        You
-      </div>
-    `;
-    return div;
-  };
 
   const calculateRoute = (originAddress: string, destinationAddress: string) => {
     if (!directionsService.current) return;
@@ -114,7 +68,7 @@ const DirectionsContent = () => {
       (result, status) => {
         if (status === google.maps.DirectionsStatus.OK && result) {
           setDirections(result);
-          
+
           if (mapRef.current && result.routes[0]) {
             const bounds = new google.maps.LatLngBounds();
             result.routes[0].legs.forEach(leg => {
@@ -128,26 +82,13 @@ const DirectionsContent = () => {
     );
   };
 
-  const fetchRouteStops = async (routeIdParam: string) => {
-    try {
-      const response = await fetch(`/api/routes/${routeIdParam}/stops`);
-      if (response.ok) {
-        const data = await response.json();
-        setRouteStops(data.stops);
-      }
-    } catch (error) {
-      console.error("Error fetching route stops:", error);
-    }
-  };
-
   useEffect(() => {
     const originParam = searchParams.get('origin');
     const destinationParam = searchParams.get('destination');
     const durationParam = searchParams.get('duration');
     const arrivalTimeParam = searchParams.get('arrivalTime');
     const distanceParam = searchParams.get('distance');
-    const routeIdParam = searchParams.get('routeId');
-    
+
     if (durationParam && arrivalTimeParam && distanceParam) {
       setRouteDetails({
         duration: decodeURIComponent(durationParam),
@@ -156,55 +97,28 @@ const DirectionsContent = () => {
       });
     }
 
-    if (routeIdParam) {
-      fetchRouteStops(routeIdParam);
-    }
-
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         handleLocationUpdate,
-        (error) => {
-          console.error("Error getting location:", error);
-        },
-        { enableHighAccuracy: true, maximumAge: 30000, timeout: 27000 }
+        () => {},
+        { enableHighAccuracy: false, maximumAge: 60000, timeout: 15000 }
       );
     }
 
     if (isLoaded) {
       directionsService.current = new google.maps.DirectionsService();
-      
       if (originParam && destinationParam) {
         calculateRoute(decodeURIComponent(originParam), decodeURIComponent(destinationParam));
       }
     }
   }, [isLoaded, searchParams, handleLocationUpdate]);
 
-  useEffect(() => {
-    if (isLoaded && userPosition) {
-      const timer = setTimeout(createUserMarker, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoaded, userPosition, createUserMarker]);
-
-  useEffect(() => {
-    if (userPosition && mapRef.current) {
-      const center = mapRef.current.getCenter();
-      if (center) {
-        const newCenter = {
-          lat: center.lat(),
-          lng: center.lng()
-        };
-        setMapCenter(newCenter);
-      }
-    }
-  }, [userPosition]);
-
   if (!isLoaded) {
     return (
       <div style={{
         minHeight: "100vh",
-        display: "flex", 
-        justifyContent: "center", 
+        display: "flex",
+        justifyContent: "center",
         alignItems: "center",
         background: "linear-gradient(to right, #1e3c72, #2a5298)",
         color: "white"
@@ -239,12 +153,8 @@ const DirectionsContent = () => {
                   fontSize: "14px",
                   transition: "background 0.2s"
                 }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
-                }}
+                onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)"; }}
               >
                 FAQ
               </button>
@@ -252,11 +162,7 @@ const DirectionsContent = () => {
           </div>
         </div>
 
-        <div style={{
-          display: "flex",
-          gap: "24px",
-          height: "calc(100vh - 100px)"
-        }}>
+        <div style={{ display: "flex", gap: "24px", height: "calc(100vh - 100px)" }}>
           <div style={{ flex: "1.5", position: "relative" }}>
             <div style={{
               position: "absolute",
@@ -293,9 +199,7 @@ const DirectionsContent = () => {
                 mapTypeControl: false,
                 styles: mapStyles
               }}
-              onLoad={(map) => {
-                mapRef.current = map;
-              }}
+              onLoad={(map) => { mapRef.current = map; }}
             >
               {userPosition && (
                 <Marker
@@ -324,21 +228,6 @@ const DirectionsContent = () => {
                   }}
                 />
               )}
-
-              {routeStops.map((stop) => (
-                <Marker
-                  key={stop.stop_id}
-                  position={{ lat: stop.lat, lng: stop.lng }}
-                  icon={{
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
-                    fillColor: "#c5acff",
-                    fillOpacity: 0.8,
-                    strokeColor: "#FFFFFF",
-                    strokeWeight: 2,
-                  }}
-                />
-              ))}
             </GoogleMap>
           </div>
 
@@ -386,4 +275,4 @@ const DirectionsContent = () => {
   );
 };
 
-export default DirectionsPage; 
+export default DirectionsPage;
