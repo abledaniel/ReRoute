@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { GoogleMap, Marker, Polyline, InfoWindow } from "@react-google-maps/api";
 import { Route, Stop, Vehicle } from '@/types/route';
-import '@/styles/map.css';
 import { mapStyles } from '@/styles/mapstyle';
 
 const mapOptions = {

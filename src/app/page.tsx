@@ -2,7 +2,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useJsApiLoader, GoogleMap, Marker, DirectionsRenderer } from "@react-google-maps/api";
 import { useRouter } from "next/navigation";
-import '@/styles/map.css';
 import { mapStyles } from '@/styles/mapstyle';
 import Link from "next/link";
 import { Route } from "@/types/route";
