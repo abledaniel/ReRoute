@@ -147,6 +147,11 @@ const Page = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [handleLocationUpdate]);
 
+  // Fetch nearby routes at default position immediately — no need to wait for Maps JS
+  useEffect(() => {
+    fetchRoutes(defaultPosition.lat, defaultPosition.lng, setRoutes);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleRouteClick = (routeId: string) => {
     router.push(`/route/${routeId}`);
   };
@@ -196,21 +201,6 @@ const Page = () => {
       router.push(`/directions?${params.toString()}`);
     }
   };
-
-  if (!isLoaded) {
-    return (
-      <div style={{
-        minHeight: "100vh",
-        background: "linear-gradient(to right, #1e3c72, #2a5298)",
-        color: "white",
-        padding: "32px"
-      }}>
-        <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-          <h1 style={{ fontSize: "24px", fontWeight: "bold" }}>Loading map...</h1>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div style={{
@@ -349,6 +339,20 @@ const Page = () => {
             </div>
 
             <div className="map-container map-wrapper">
+              {!isLoaded ? (
+                <div style={{
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#93c5fd",
+                  fontSize: "14px",
+                  background: "rgba(0,0,0,0.2)",
+                  borderRadius: "10px"
+                }}>
+                  Loading map...
+                </div>
+              ) : (
               <GoogleMap
                 zoom={14}
                 center={mapCenter}
@@ -361,10 +365,7 @@ const Page = () => {
                   gestureHandling: "greedy",
                   styles: mapStyles,
                 }}
-                onLoad={(map) => {
-                  mapRef.current = map;
-                  fetchRoutes(defaultPosition.lat, defaultPosition.lng, setRoutes);
-                }}
+                onLoad={(map) => { mapRef.current = map; }}
                 onDragEnd={handleMapCenterChanged}
                 onZoomChanged={handleMapCenterChanged}
               >
@@ -395,6 +396,7 @@ const Page = () => {
                   />
                 )}
               </GoogleMap>
+              )}
             </div>
           </div>
 
